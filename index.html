@@ -23,6 +23,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font-family:var(--sans);margin:0;
   padding-left:max(14px,env(safe-area-inset-left,0px));
   padding-right:max(14px,env(safe-area-inset-right,0px));
@@ -92,6 +93,20 @@ label.boton input{position:absolute;width:1px;height:1px;opacity:0;pointer-event
 .kv span:last-child{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:650}
 footer{font-size:11.5px;color:var(--muted);line-height:1.5}
 
+/* ---- velo de medición: ocupa la pantalla para que nadie siga andando ---- */
+.velo{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.94);display:flex;
+  align-items:center;justify-content:center;
+  padding:max(20px,env(safe-area-inset-left,0px)) max(20px,env(safe-area-inset-right,0px))}
+.veloCaja{max-width:460px;width:100%;border:2px solid var(--teal);background:var(--panel);padding:20px;text-align:center}
+.veloTit{font-family:var(--cond);text-transform:uppercase;letter-spacing:.04em;font-weight:700;
+  font-size:21px;color:var(--crema);line-height:1.15}
+.veloTxt{font-size:13.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+.velo .cuenta{font-family:var(--mono);font-size:84px;font-weight:700;color:var(--teal);
+  line-height:1;margin:14px 0 4px;border:0;background:none;padding:0;display:block}
+.veloEstado{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.velo.midiendo .veloCaja{border-color:var(--warn)}
+.velo.midiendo .veloTit{color:var(--warn)}
+
 /* ---- pantalla principal: lo de cada parada, sin bajar ---- */
 .foco{border-top:3px solid var(--teal)}
 .cinta{display:flex;gap:4px;margin-top:12px}
@@ -141,7 +156,7 @@ details.panel>*:last-child{margin-bottom:14px}
   <div class="panel foco">
     <div class="row">
       <button id="btnGps" class="primary">Activar GPS</button>
-      <button id="btnProm" disabled>Promediar 30 s</button>
+      <button id="btnProm" disabled>Medir punto · 30 s</button>
     </div>
 
     <div class="cinta">
@@ -267,6 +282,13 @@ details.panel>*:last-child{margin-bottom:14px}
       La cota sale del GPS: error típico de 10 a 20 m, bastante peor que el horizontal.
       Para el perfil sirve el MDT, no esto.
     </div>
+    <label class="lab">Altura del móvil sobre el suelo (m)
+      <input id="hAnt" type="number" step="0.1" value="1.0" style="margin-top:4px">
+    </label>
+    <div class="aviso">
+      Se resta de la altitud del GPS para dar la cota del terreno, y se tiene en cuenta
+      al calibrar. Si dejas el móvil en el suelo, pon 0.
+    </div>
     <div class="grid2" style="margin-top:10px">
       <label class="lab">Corrección geoidal (m)
         <input id="geoide" type="number" step="0.1" value="49.5" style="margin-top:4px">
@@ -290,6 +312,22 @@ details.panel>*:last-child{margin-bottom:14px}
       <span>Estado</span><span id="estado" style="font-family:var(--sans)">En espera</span>
     </div>
   </details>
+
+  <div class="velo" id="velo" hidden>
+    <div class="veloCaja">
+      <div class="veloTit" id="veloTit">¿Estás justo encima de la marca?</div>
+      <div class="veloTxt" id="veloTxt">
+        Colócate con el móvil sobre la marca que acaba de poner el homologador,
+        a la altura habitual, y no te muevas hasta que acabe la cuenta.
+      </div>
+      <div class="cuenta" id="cuentaAtras" hidden>30</div>
+      <div class="veloEstado" id="veloEstado" hidden>0 lecturas</div>
+      <div class="row" style="margin-top:16px">
+        <button id="btnVeloSi" class="primary">Sí, empezar</button>
+        <button id="btnVeloNo">Todavía no</button>
+      </div>
+    </div>
+  </div>
 
   <footer>
     Objetivo de la medición homologada: <strong class="num">42.195 m</strong> reales sobre la línea óptima.
@@ -372,10 +410,15 @@ const TOL_REF = 150;   // m a lo largo del eje para considerar que estás en el 
 
 try { const g = localStorage.getItem('geoideV06'); if (g) $('geoide').value = g; } catch(e){}
 
+function hAntena(){
+  const h = parseFloat($('hAnt').value);
+  return isFinite(h) ? h : 0;
+}
+
 function pintarCota(){
   const N = parseFloat($('geoide').value);
   if (altActual == null){ $('cota').textContent = '—'; return; }
-  const orto = altActual - (isFinite(N) ? N : 0);
+  const orto = altActual - (isFinite(N) ? N : 0) - hAntena();
   $('cota').textContent = fmt(orto, 1) + ' m'
     + (altPrecision != null ? ' ±' + fmt(altPrecision, 0) : '');
 }
@@ -482,7 +525,7 @@ $('btnCalRef').addEventListener('click', () => {
       '. Acércate a menos de ' + TOL_REF + ' m o usa una cota conocida.';
     return;
   }
-  const N = altActual - r.cota;
+  const N = altActual - hAntena() - r.cota;
   fijarGeoide(N, 'Calibrado en ' + r.nombre + ' (cota MDT ' + fmt(r.cota,1) + ' m, a ' +
     fmt(r.d,0) + ' m del punto). Corrección geoidal = ' + fmt(N,1) + ' m.');
 });
@@ -491,7 +534,7 @@ $('btnCalMan').addEventListener('click', () => {
   const c = parseFloat($('cotaConocida').value);
   if (altActual == null){ $('calInfo').textContent = 'Todavía no hay altitud del GPS.'; return; }
   if (!isFinite(c)){ $('calInfo').textContent = 'Escribe primero la cota conocida de donde estás.'; return; }
-  const N = altActual - c;
+  const N = altActual - hAntena() - c;
   fijarGeoide(N, 'Calibrado con cota ' + fmt(c,1) + ' m introducida a mano. Corrección geoidal = ' +
     fmt(N,1) + ' m.');
 });
@@ -517,6 +560,7 @@ function pintar(s, desvio, prec){
   const sA = k * 1000, sB = k * PASO_B;
   $('etA').textContent = k + 'a';
   $('etB').textContent = k + 'b';
+  if (typeof pintarMedida === 'function') pintarMedida();
   $('dA').textContent = sig(s - sA);
   $('dB').textContent = sig(s - sB);
 
@@ -584,31 +628,104 @@ function arrancarGps(){
 
 $('btnGps').addEventListener('click', arrancarGps);
 
-$('btnProm').addEventListener('click', () => {
-  if (promediando) return;
+/* ---------- medición del punto ----------
+   Treinta segundos quieto sobre la marca. El velo tapa la pantalla a propósito:
+   si alguien sigue andando mientras mide, la media no vale para nada. */
+let medidaEn = null;          // {s, t} de la última medición válida
+let tempo = null, finMedida = 0;
+
+function abrirVelo(){
+  $('velo').hidden = false;
+  $('velo').classList.remove('midiendo');
+  $('veloTit').textContent = '¿Estás justo encima de la marca?';
+  $('veloTxt').textContent = 'Colócate con el móvil sobre la marca que acaba de poner el homologador, '
+    + 'a la altura de siempre (' + fmt(hAntena(),1) + ' m), y no te muevas hasta que acabe la cuenta.';
+  $('cuentaAtras').hidden = true;
+  $('veloEstado').hidden = true;
+  $('btnVeloSi').hidden = false;
+  $('btnVeloNo').textContent = 'Todavía no';
+}
+
+function cerrarVelo(){
+  $('velo').hidden = true;
+  $('velo').classList.remove('midiendo');
+  if (tempo){ clearInterval(tempo); tempo = null; }
+  promediando = false;
+  $('btnProm').disabled = false;
+}
+
+$('btnProm').addEventListener('click', () => { if (!promediando) abrirVelo(); });
+$('btnVeloNo').addEventListener('click', cerrarVelo);
+
+$('btnVeloSi').addEventListener('click', () => {
   promediando = true; buffer = []; bufAlt = [];
   $('btnProm').disabled = true;
-  setTimeout(() => {
-    promediando = false;
-    $('btnProm').disabled = false;
-    if (!buffer.length){ $('estado').textContent = 'No llegó ninguna lectura'; return; }
-    const mediana = v => { const o = v.slice().sort((x,y)=>x-y);
-      return o.length % 2 ? o[(o.length-1)/2] : (o[o.length/2-1] + o[o.length/2]) / 2; };
-    const o = buffer.slice().sort((x,y) => x-y);
-    const disp = o[o.length-1] - o[0];
-    pintar(mediana(buffer), 0, null);
-    $('desvio').textContent = '—';
-    let txt = 'Promedio de ' + o.length + ' lecturas · dispersión ' + fmt(disp,0) + ' m';
-    if (bufAlt.length){
-      altActual = mediana(bufAlt); altPrecision = null; pintarCota();
-      const a = bufAlt.slice().sort((x,y)=>x-y);
-      dispCota = a[a.length-1] - a[0];
-      txt += ' · cota ' + fmt(dispCota,0) + ' m';
-    }
-    $('estado').textContent = txt;
-    calcular();
-  }, 30000);
+  $('velo').classList.add('midiendo');
+  $('veloTit').textContent = '⚠️ No te muevas';
+  $('veloTxt').textContent = 'Midiendo sobre la marca. Mantén el móvil quieto y en alto, sin taparlo con el cuerpo.';
+  $('btnVeloSi').hidden = true;
+  $('btnVeloNo').textContent = 'Cancelar';
+  $('cuentaAtras').hidden = false;
+  $('veloEstado').hidden = false;
+  finMedida = Date.now() + 30000;
+
+  tempo = setInterval(() => {
+    const quedan = Math.max(0, Math.ceil((finMedida - Date.now()) / 1000));
+    $('cuentaAtras').textContent = quedan;
+    $('veloEstado').textContent = buffer.length + (buffer.length === 1 ? ' lectura' : ' lecturas');
+    if (quedan <= 0) rematarMedida();
+  }, 250);
 });
+
+function rematarMedida(){
+  clearInterval(tempo); tempo = null;
+  promediando = false;
+  $('btnProm').disabled = false;
+  $('velo').hidden = true;
+  $('velo').classList.remove('midiendo');
+
+  if (!buffer.length){
+    $('estado').textContent = 'No llegó ninguna lectura del GPS.';
+    $('veredicto').textContent = 'La medición no ha dado lecturas. Comprueba el GPS y repítela.';
+    $('veredicto').style.color = 'var(--bad)';
+    return;
+  }
+  const mediana = v => { const o = v.slice().sort((x,y)=>x-y);
+    return o.length % 2 ? o[(o.length-1)/2] : (o[o.length/2-1] + o[o.length/2]) / 2; };
+  const o = buffer.slice().sort((x,y) => x-y);
+  const disp = o[o.length-1] - o[0];
+  const s = mediana(buffer);
+  pintar(s, 0, null);
+  $('desvio').textContent = '—';
+  medidaEn = {s: s, t: Date.now()};
+
+  let txt = 'Punto medido · ' + o.length + ' lecturas · dispersión ' + fmt(disp,0) + ' m';
+  if (bufAlt.length){
+    altActual = mediana(bufAlt); altPrecision = null; pintarCota();
+    const a = bufAlt.slice().sort((x,y)=>x-y);
+    dispCota = a[a.length-1] - a[0];
+    txt += ' · cota ' + fmt(dispCota,0) + ' m';
+  }
+  $('estado').textContent = txt;
+  calcular();
+  pintarMedida();
+}
+
+/* Avisa si vas a registrar una parada sin haber medido el punto, o si te has
+   movido desde que lo mediste. No lo impide: a veces hace falta apuntar deprisa. */
+function medidaFresca(){
+  if (!medidaEn || sActual == null) return false;
+  if (Date.now() - medidaEn.t > 300000) return false;      // más de 5 min
+  return Math.abs(sActual - medidaEn.s) < 15;              // te has movido poco
+}
+
+function pintarMedida(){
+  const b = $('btnReg');
+  if (sActual == null){ b.textContent = '✓\nRegistrar\nparada'; return; }
+  b.innerHTML = medidaFresca()
+    ? '✓<br>Registrar<br>parada'
+    : '⚠️<br>Registrar<br>sin medir';
+}
 
 let ultimaProy = null;
 function calcular(){
@@ -828,6 +945,11 @@ $('camara').addEventListener('change', async e => {
 
 $('btnReg').addEventListener('click', () => {
   if (sActual == null) return;
+  if (!medidaFresca()){
+    $('veredicto').textContent = 'Parada apuntada SIN los 30 s de medición: vale como referencia, '
+      + 'pero no para decidir. Pulsa «Medir punto» y vuelve a registrar.';
+    $('veredicto').style.color = 'var(--warn)';
+  }
   let k = Math.round(sActual / PASO_B); k = Math.max(1, Math.min(42, k));
   const km = parseFloat($('kmHom').value);
   const N = parseFloat($('geoide').value);
@@ -835,9 +957,10 @@ $('btnReg').addEventListener('click', () => {
     hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
     km: isFinite(km) ? km : null,
     usuario: quien(),
+    medido: medidaFresca(),
     s: sActual, pk: k,
     dA: sActual - k*1000, dB: sActual - k*PASO_B,
-    cota: altActual == null ? null : altActual - (isFinite(N) ? N : 0),
+    cota: altActual == null ? null : altActual - (isFinite(N) ? N : 0) - hAntena(),
     cotaDisp: dispCota,
     lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null,
     proy: ultimaProy
@@ -933,8 +1056,8 @@ $('btnBorrar').addEventListener('click', async () => {
 });
 
 function csv(){
-  const cab = 'hora;usuario;km_homologador;metro_trazado;pk;dist_a_A_m;dist_a_B_m;cota_gps_m;dispersion_cota_m;lat;lon;longitud_previsible_m\n';
-  const cuerpo = paradas.map(p => [p.hora, p.usuario ?? '', p.km ?? '', p.s.toFixed(1), p.pk,
+  const cab = 'hora;usuario;medido_30s;km_homologador;metro_trazado;pk;dist_a_A_m;dist_a_B_m;cota_gps_m;dispersion_cota_m;lat;lon;longitud_previsible_m\n';
+  const cuerpo = paradas.map(p => [p.hora, p.usuario ?? '', p.medido ? 'si' : 'no', p.km ?? '', p.s.toFixed(1), p.pk,
       p.dA.toFixed(1), p.dB.toFixed(1),
       p.cota == null ? '' : p.cota.toFixed(1), p.cotaDisp == null ? '' : p.cotaDisp.toFixed(1),
       p.lat == null ? '' : p.lat.toFixed(7), p.lon == null ? '' : p.lon.toFixed(7),
