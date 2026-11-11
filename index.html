@@ -156,7 +156,7 @@ details.panel>*:last-child{margin-bottom:14px}
   <div class="cabecera">
     <h1>Control de homologación</h1>
     <p class="sub">Maratón Elche–Alicante · V06 · <span class="num">42.507,89 m</span> · <span id="quienCab">—</span>
-      · <span class="num" id="version">v17</span></p>
+      · <span class="num" id="version">v18</span></p>
   </div>
 
   <!-- Todo lo que se usa en cada parada cabe aquí, sin bajar la pantalla. -->
@@ -762,7 +762,10 @@ $('btnVeloSi').addEventListener('click', () => {
     $('cuentaAtras').textContent = quedan;
     if (!yaDisparo) $('veloEstado').textContent = buffer.length + (buffer.length === 1 ? ' lectura' : ' lecturas');
     // A mitad de cuenta: la posición ya se ha asentado y aún queda margen por si falla.
-    if (!yaDisparo && flujo && quedan <= 15) disparar();
+    if (!yaDisparo && flujo && quedan <= 15){
+      yaDisparo = true;                       // se marca ANTES del await
+      disparar().then(ok => { if (!ok) yaDisparo = false; });
+    }
     if (quedan <= 0) rematarMedida();
   }, 250);
 });
@@ -1081,7 +1084,9 @@ async function guardarDisparo(fuente, m30){
     + (ultimaCoord ? ' · ' + ultimaCoord.la.toFixed(6) + ', ' + ultimaCoord.lo.toFixed(6) : '');
   try {
     const blob = await procesarFoto(fuente, {titulo: etq + ' · Maratón Elche-Alicante V06', detalle});
-    const sello = ahora.toISOString().slice(0,16).replace('T','_').replace(/[:-]/g,'');
+    const dd = n => String(n).padStart(2, '0');
+    const sello = ahora.getFullYear() + dd(ahora.getMonth()+1) + dd(ahora.getDate())
+      + '_' + dd(ahora.getHours()) + dd(ahora.getMinutes()) + dd(ahora.getSeconds());
     const nombre = etq.replace(/[^0-9A-Za-z]+/g,'-') + '_' + yo + (m30 ? '_M30' : '') + '_' + sello + '.jpg';
     await guardarFoto({
       etiqueta: etq, usuario: yo, m30: !!m30, nombre: nombre,
