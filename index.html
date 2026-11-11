@@ -124,12 +124,22 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
       <div><div class="lab">Cota GPS</div><div class="mid" id="cota">—</div></div>
     </div>
     <div class="aviso">
-      La cota sale del GPS y es orientativa: error típico de 10 a 20 m, bastante peor que el horizontal.
+      La cota sale del GPS: error típico de 10 a 20 m, bastante peor que el horizontal.
       Para el perfil sirve el MDT, no esto.
-      <label style="display:block;margin-top:8px">Corrección geoidal aplicada (m)
+    </div>
+    <div class="grid2" style="margin-top:10px">
+      <label class="lab">Corrección geoidal (m)
         <input id="geoide" type="number" step="0.1" value="49.5" style="margin-top:4px">
       </label>
+      <label class="lab">Cota conocida (m)
+        <input id="cotaConocida" type="number" step="0.1" placeholder="opcional" style="margin-top:4px">
+      </label>
     </div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnCalRef">Calibrar en punto de referencia</button>
+      <button id="btnCalMan">Calibrar con la cota escrita</button>
+    </div>
+    <div class="aviso" id="calInfo">Sin calibrar. Valor de partida: 49,5 m.</div>
   </div>
 
   <div class="panel">
@@ -256,6 +266,24 @@ const $ = id => document.getElementById(id);
 let sActual = null, watchId = null, promediando = false, buffer = [], bufAlt = [], wake = null;
 let altActual = null, altPrecision = null, dispCota = null, ultimaCoord = null;
 
+/* Cotas de referencia del MDT europeo de 25 m (EU-DEM), ortométricas.
+   Sirven para despejar la ondulación del geoide: N = altura GPS elipsoidal − cota real. */
+const REF = [
+  ['Salida',     0.0, 87.4],
+  ['5b',      5037.1, 92.0],
+  ['10b',    10074.2, 77.5],
+  ['15b',    15111.2, 78.8],
+  ['20b',    20148.3, 86.1],
+  ['25b',    25185.4, 81.0],
+  ['30b',    30222.5, 57.1],
+  ['35b',    35259.5, 12.4],
+  ['40b',    40296.6,  5.7],
+  ['Meta',   42507.9,  4.2]
+];
+const TOL_REF = 150;   // m a lo largo del eje para considerar que estás en el punto
+
+try { const g = localStorage.getItem('geoideV06'); if (g) $('geoide').value = g; } catch(e){}
+
 function pintarCota(){
   const N = parseFloat($('geoide').value);
   if (altActual == null){ $('cota').textContent = '—'; return; }
@@ -263,7 +291,64 @@ function pintarCota(){
   $('cota').textContent = fmt(orto, 1) + ' m'
     + (altPrecision != null ? ' ±' + fmt(altPrecision, 0) : '');
 }
-document.addEventListener('input', e => { if (e.target.id === 'geoide') pintarCota(); });
+
+function refMasCercana(){
+  if (sActual == null) return null;
+  let mejor = null;
+  for (const r of REF){
+    const d = Math.abs(r[1] - sActual);
+    if (!mejor || d < mejor.d) mejor = {nombre: r[0], s: r[1], cota: r[2], d};
+  }
+  return mejor;
+}
+
+function fijarGeoide(N, texto){
+  $('geoide').value = N.toFixed(1);
+  try { localStorage.setItem('geoideV06', N.toFixed(1)); } catch(e){}
+  pintarCota();
+  $('calInfo').textContent = texto;
+}
+
+function pistaRef(){
+  if (altActual == null || sActual == null) return;
+  const r = refMasCercana();
+  if (!r) return;
+  const btn = $('btnCalRef');
+  btn.disabled = false;
+  if (r.d <= TOL_REF) btn.textContent = 'Calibrar aquí (' + r.nombre + ')';
+  else btn.textContent = 'Punto de calibración más próximo: ' + r.nombre;
+}
+
+$('btnCalRef').addEventListener('click', () => {
+  if (altActual == null){ $('calInfo').textContent = 'Todavía no hay altitud del GPS.'; return; }
+  const r = refMasCercana();
+  if (!r){ $('calInfo').textContent = 'Primero hay que tener posición.'; return; }
+  if (r.d > TOL_REF){
+    $('calInfo').textContent = 'Estás a ' + fmt(r.d, 0) + ' m del punto ' + r.nombre +
+      '. Acércate a menos de ' + TOL_REF + ' m o usa una cota conocida.';
+    return;
+  }
+  const N = altActual - r.cota;
+  fijarGeoide(N, 'Calibrado en ' + r.nombre + ' (cota MDT ' + fmt(r.cota,1) + ' m, a ' +
+    fmt(r.d,0) + ' m del punto). Corrección geoidal = ' + fmt(N,1) + ' m.');
+});
+
+$('btnCalMan').addEventListener('click', () => {
+  const c = parseFloat($('cotaConocida').value);
+  if (altActual == null){ $('calInfo').textContent = 'Todavía no hay altitud del GPS.'; return; }
+  if (!isFinite(c)){ $('calInfo').textContent = 'Escribe primero la cota conocida de donde estás.'; return; }
+  const N = altActual - c;
+  fijarGeoide(N, 'Calibrado con cota ' + fmt(c,1) + ' m introducida a mano. Corrección geoidal = ' +
+    fmt(N,1) + ' m.');
+});
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'geoide'){
+    pintarCota();
+    try { localStorage.setItem('geoideV06', e.target.value); } catch(err){}
+    $('calInfo').textContent = 'Corrección introducida a mano: ' + e.target.value + ' m.';
+  }
+});
 
 function pintar(s, desvio, prec){
   sActual = s;
@@ -303,6 +388,7 @@ function pintar(s, desvio, prec){
     eb.style.color = 'var(--good)';
   }
   $('btnReg').disabled = false;
+  pistaRef();
 }
 
 function arrancarGps(){
