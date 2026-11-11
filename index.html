@@ -124,8 +124,8 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
 .filakm #kmHom{flex:1 1 auto;min-width:0;font-size:30px;font-weight:700;text-align:center;
   padding:10px 6px;border:1px solid var(--line);background:var(--bg);color:var(--crema)}
 .filakm #kmHom::placeholder{color:#4a555e;font-weight:700}
-.filakm #btnKmMas{flex:0 0 58px;width:auto;padding:10px 0;font-size:17px}
-.filakm #btnCalc{flex:0 0 124px;width:auto}
+.filakm #btnKmMas,.filakm #btnKmMenos{flex:0 0 50px;width:auto;padding:10px 0;font-size:17px}
+.filakm #btnCalc{flex:0 0 106px;width:auto;font-size:13px}
 .filalab{display:flex;align-items:center;gap:6px}
 .filalab .lab{flex:1 1 auto;min-width:0}
 .chico{flex:0 0 auto;width:auto;padding:4px 10px;font-size:11.5px;border-color:var(--line);color:var(--muted)}
@@ -195,6 +195,7 @@ details.panel>*:last-child{margin-bottom:14px}
       </div>
       <div class="filakm">
         <input id="kmHom" type="number" inputmode="decimal" step="0.001" placeholder="40">
+        <button id="btnKmMenos" title="Kilómetro anterior">−1</button>
         <button id="btnKmMas" title="Siguiente kilómetro">+1</button>
         <button id="btnCalc" class="primary">Calcular</button>
       </div>
@@ -865,13 +866,15 @@ function calcular(){
     verdicto('Sobran ' + fmt(dif,0) + ' m. Habría que adelantar la meta o la salida.' + fiable, 'var(--warn)');
   }
 }
-/* El homologador canta los kilómetros en orden: +1 ahorra teclear en cada parada. */
-$('btnKmMas').addEventListener('click', () => {
+/* El homologador canta los kilómetros en orden: +1 y −1 ahorran teclear,
+   y −1 saca de un km mal metido sin tener que borrarlo a mano. */
+function saltarKm(paso){
   const v = parseFloat($('kmHom').value);
-  const base = isFinite(v) ? Math.floor(v) : (sActual == null ? 0 : Math.round(sActual / PASO_B));
-  $('kmHom').value = Math.min(42, base + 1);
-  calcular();
-});
+  const base = isFinite(v) ? Math.round(v) : (sActual == null ? 0 : Math.round(sActual / PASO_B));
+  fijarKm(Math.max(0, Math.min(42, base + paso)), null);
+}
+$('btnKmMas').addEventListener('click', () => saltarKm(1));
+$('btnKmMenos').addEventListener('click', () => saltarKm(-1));
 $('btnCalc').addEventListener('click', calcular);
 $('kmHom').addEventListener('input', calcular);
 
