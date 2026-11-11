@@ -31,6 +31,7 @@ escribir el kilómetro no es opcional: es lo que desambigua la lectura.
 | Archivo | Contenido |
 | --- | --- |
 | `index.html` | Aplicación completa, con el trazado y los 84 puntos embebidos |
+| | Incluye foto rotulada por punto y cota GPS, guardadas en el navegador |
 | `sw.js` | Service worker: cachea la app para usarla sin red |
 | `manifest.webmanifest` | Instalación como aplicación en la pantalla de inicio |
 | `icon-192.png`, `icon-512.png` | Iconos |
