@@ -230,6 +230,30 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
       <button id="btnZip" disabled>Descargar todo (fotos + CSV)</button>
     </div>
     <button id="btnBorrar" style="margin-top:10px">Borrar registro y fotos</button>
+  </div>
+
+  <div class="panel">
+    <div class="lab">Hoja de Google</div>
+    <div class="kv" style="margin-top:8px">
+      <span>Pendientes de enviar</span><span id="pend">0</span>
+    </div>
+    <div class="kv">
+      <span>Último envío</span><span id="ultEnv" style="font-family:var(--sans)">—</span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnSync" class="primary">Sincronizar ahora</button>
+      <button id="btnUrl">Cambiar enlace</button>
+    </div>
+    <div id="cajaUrl" hidden style="margin-top:10px">
+      <label class="lab">URL del Apps Script (termina en /exec)
+        <input id="urlApi" type="url" placeholder="https://script.google.com/macros/s/…/exec" style="margin-top:4px;font-size:12px">
+      </label>
+      <div class="row" style="margin-top:8px">
+        <button id="btnUrlOk" class="primary">Guardar</button>
+        <button id="btnUrlNo">Cancelar</button>
+      </div>
+    </div>
+    <div class="aviso" id="syncInfo">Cada parada se guarda en el móvil y se envía sola cuando hay cobertura.</div>
     <div class="aviso">
       Las fotos se guardan dentro del navegador del móvil, no en el repositorio: la app sigue pesando
       35 KB. Al acabar, descarga el paquete y súbelo a Drive de una vez.
@@ -764,7 +788,77 @@ $('btnReg').addEventListener('click', () => {
     proy: ultimaProy
   });
   guardar(); pintarTabla(); pintarTira();
+  encolar(paradas[paradas.length - 1]);
+  sincronizar(true);
 });
+
+/* ---------- envío a la hoja de Google ----------
+   Nada se envía directo y se olvida: cada parada entra en una cola guardada en el
+   móvil, se intenta mandar, y si no hay cobertura se queda esperando. */
+const API_POR_DEFECTO = '';
+let apiUrl = '';
+try { apiUrl = localStorage.getItem('apiV06') || API_POR_DEFECTO; } catch(e){ apiUrl = API_POR_DEFECTO; }
+$('urlApi').value = apiUrl;
+
+let cola = [];
+try { cola = JSON.parse(localStorage.getItem('colaV06') || '[]'); } catch(e){ cola = []; }
+function guardarCola(){ try { localStorage.setItem('colaV06', JSON.stringify(cola)); } catch(e){} }
+
+function pintarSync(){
+  $('pend').textContent = cola.length;
+  $('pend').style.color = cola.length ? 'var(--warn)' : 'var(--good)';
+  $('btnSync').disabled = !cola.length || !apiUrl;
+  if (!apiUrl) $('syncInfo').textContent = 'Falta el enlace del Apps Script. Pulsa «Cambiar enlace» y pégalo.';
+}
+
+$('btnUrl').addEventListener('click', () => { $('cajaUrl').hidden = false; });
+$('btnUrlNo').addEventListener('click', () => { $('cajaUrl').hidden = true; $('urlApi').value = apiUrl; });
+$('btnUrlOk').addEventListener('click', () => {
+  apiUrl = $('urlApi').value.trim();
+  try { localStorage.setItem('apiV06', apiUrl); } catch(e){}
+  $('cajaUrl').hidden = true;
+  $('syncInfo').textContent = apiUrl ? 'Enlace guardado.' : 'Enlace borrado: la app sólo guardará en el móvil.';
+  pintarSync(); sincronizar();
+});
+
+function encolar(p){ cola.push(p); guardarCola(); pintarSync(); }
+
+let enviando = false;
+async function sincronizar(silencio){
+  if (enviando || !cola.length || !apiUrl) return;
+  if (!navigator.onLine){ if (!silencio) $('syncInfo').textContent = 'Sin cobertura. Quedan ' + cola.length + ' por enviar.'; return; }
+  enviando = true;
+  $('btnSync').disabled = true;
+  const lote = cola.slice();
+  try {
+    const r = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},   // petición simple: sin preflight
+      body: JSON.stringify({version: 'V06', paradas: lote})
+    });
+    const j = await r.json();
+    if (!j || j.ok !== true) throw new Error(j && j.error ? j.error : 'respuesta inesperada');
+    cola = cola.slice(lote.length);
+    guardarCola();
+    const h = new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    try { localStorage.setItem('ultEnvV06', h); } catch(e){}
+    $('ultEnv').textContent = h + ' · ' + lote.length + (lote.length === 1 ? ' fila' : ' filas');
+    $('syncInfo').textContent = 'Enviado a la hoja. ' + (cola.length ? cola.length + ' pendientes todavía.' : 'Todo al día.');
+  } catch(err){
+    $('syncInfo').textContent = 'No se pudo enviar (' + err.message + '). Quedan ' + cola.length +
+      ' esperando; se reintenta solo al recuperar cobertura.';
+  } finally {
+    enviando = false;
+    pintarSync();
+  }
+}
+
+$('btnSync').addEventListener('click', () => sincronizar());
+window.addEventListener('online', () => sincronizar(true));
+setInterval(() => sincronizar(true), 60000);
+try { const u = localStorage.getItem('ultEnvV06'); if (u) $('ultEnv').textContent = u; } catch(e){}
+pintarSync();
+sincronizar(true);
 
 $('btnBorrar').addEventListener('click', async () => {
   paradas = []; guardar(); pintarTabla();
