@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f6f8">
+<title>Control de Homologación</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* Instrumento de campo: una columna, lectura grande, sin dependencias externas */
+:root{
+  --bg:#f4f6f8; --panel:#ffffff; --fg:#10161d; --muted:#5d6b7a; --line:#d7dde4;
+  --a:#1565c0; --b:#2e8b3d; --warn:#c75c00; --bad:#c62828; --good:#2e7d32;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#0e1319; --panel:#171d25; --fg:#eef2f6; --muted:#93a1b0; --line:#2b343f;
+  --a:#5fa8f5; --b:#5ec96f; --warn:#ffa24d; --bad:#ff6b6b; --good:#6fd080; color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#0e1319; --panel:#171d25; --fg:#eef2f6; --muted:#93a1b0; --line:#2b343f;
+  --a:#5fa8f5; --b:#5ec96f; --warn:#ffa24d; --bad:#ff6b6b; --good:#6fd080; color-scheme:dark; }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);margin:0;
+  padding-left:max(14px,env(safe-area-inset-left,0px));
+  padding-right:max(14px,env(safe-area-inset-right,0px));
+  padding-block:12px 28px;font-size:15px;line-height:1.45}
+.wrap{display:flex;flex-direction:column;gap:12px;max-width:560px;margin:0 auto}
+h1{font-size:15px;margin:0;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650}
+.sub{font-size:12px;color:var(--muted);margin:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.lab{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:650}
+.big{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:40px;line-height:1.05;font-weight:650;letter-spacing:-.02em}
+.mid{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:24px;font-weight:650}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 150px;min-width:0}
+button{font:inherit;font-weight:600;padding:13px 14px;border-radius:10px;border:1px solid var(--line);
+  background:var(--panel);color:var(--fg);cursor:pointer;width:100%}
+button.primary{background:var(--fg);color:var(--panel);border-color:var(--fg)}
+button:disabled{opacity:.45}
+button:focus-visible,input:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+input{font:inherit;font-family:var(--mono);padding:12px;border-radius:10px;border:1px solid var(--line);
+  background:var(--bg);color:var(--fg);width:100%}
+/* banda a <-> b */
+.banda{position:relative;height:62px;margin-top:10px;overflow:hidden}
+.fuera{position:absolute;top:28px;height:6px;border-radius:3px;background:var(--line)}
+.pista{position:absolute;left:25%;right:25%;top:26px;height:10px;border-radius:5px;
+  background:linear-gradient(90deg,var(--a),var(--b))}
+.tope{position:absolute;top:18px;width:2px;height:26px;background:var(--muted);opacity:.55}
+.marca{position:absolute;top:11px;width:3px;height:38px;background:var(--fg);border-radius:2px;
+  transition:left .25s ease}
+.marca.tope-izq,.marca.tope-der{width:9px;background:var(--bad);border-radius:2px}
+.banda .ta,.banda .tb{position:absolute;top:0;font-size:11px;font-weight:700;transform:translateX(-50%)}
+.banda .ta{left:25%;color:var(--a)}
+.banda .tb{left:75%;color:var(--b)}
+.estadoBanda{font-size:12.5px;font-weight:650;margin:2px 0 10px}
+.veredicto{font-weight:650;font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--line);
+  font-variant-numeric:tabular-nums;font-family:var(--mono)}
+th:first-child,td:first-child{text-align:left;font-family:var(--sans)}
+th{color:var(--muted);font-weight:650;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
+.tabla-wrap{overflow-x:auto}
+.pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:700;
+  letter-spacing:.03em}
+.ok{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.at{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+.ko{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
+.kv:last-child{border-bottom:0}
+.kv span:last-child{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:650}
+footer{font-size:11.5px;color:var(--muted);line-height:1.5}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+  <div>
+    <h1>Control de homologación</h1>
+    <p class="sub">Maratón Elche–Alicante · trazado V06 · <span class="num">42.507,89 m</span> dibujados</p>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <button id="btnGps" class="primary">Activar GPS</button>
+      <button id="btnProm" disabled>Promediar 30 s</button>
+    </div>
+    <div class="kv" style="margin-top:12px">
+      <span>Estado</span><span id="estado" style="font-family:var(--sans)">En espera</span>
+    </div>
+    <div class="kv">
+      <span>Precisión GPS</span><span id="prec">—</span>
+    </div>
+    <div class="kv">
+      <span>Separación del eje</span><span id="desvio">—</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="lab">Metro del trazado</div>
+    <div class="big" id="metro">—</div>
+    <div class="grid2" style="margin-top:10px">
+      <div><div class="lab">Km oficial · escala b</div><div class="mid" id="kmof">—</div></div>
+      <div><div class="lab">Falta a meta</div><div class="mid" id="falta">—</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="lab">Posición entre los puntos marcados</div>
+    <div class="banda">
+      <div class="ta" id="etA">—</div>
+      <div class="tb" id="etB">—</div>
+      <div class="fuera" style="left:0;width:25%"></div>
+      <div class="fuera" style="right:0;width:25%"></div>
+      <div class="pista"></div>
+      <div class="tope" style="left:25%"></div>
+      <div class="tope" style="left:75%"></div>
+      <div class="marca" id="marca" style="left:50%"></div>
+    </div>
+    <div class="estadoBanda" id="estadoBanda" style="color:var(--muted)">Sin posición todavía</div>
+    <div class="grid2">
+      <div><div class="lab">Respecto al azul</div><div class="mid" id="dA" style="color:var(--a)">—</div></div>
+      <div><div class="lab">Respecto al verde</div><div class="mid" id="dB" style="color:var(--b)">—</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="lab">Lectura del homologador</div>
+    <div class="row" style="margin-top:8px">
+      <input id="kmHom" type="number" inputmode="decimal" step="0.001" placeholder="Km medido, p. ej. 40">
+      <button id="btnCalc">Calcular</button>
+    </div>
+    <div style="margin-top:14px">
+      <div class="lab">Longitud final previsible</div>
+      <div class="big" id="proy">—</div>
+      <div class="veredicto" id="veredicto" style="margin-top:4px;color:var(--muted)">
+        Introduce el kilómetro que te cante el homologador.
+      </div>
+    </div>
+    <button id="btnReg" style="margin-top:14px" disabled>Registrar esta parada</button>
+  </div>
+
+  <div class="panel">
+    <div class="lab">Paradas registradas</div>
+    <div class="tabla-wrap">
+      <table id="tabla">
+        <thead><tr><th>Hora</th><th>Km hom.</th><th>Metro</th><th>vs A</th><th>vs B</th><th>Previsión</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="6" style="text-align:center;color:var(--muted);font-family:var(--sans)">Sin paradas todavía</td></tr></tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="btnCsv" disabled>Descargar CSV</button>
+      <button id="btnBorrar">Borrar registro</button>
+    </div>
+  </div>
+
+  <footer>
+    Objetivo de la medición homologada: <strong class="num">42.195 m</strong> reales sobre la línea óptima.
+    Si la previsión queda por debajo, faltan metros y hay que alejar la meta o retrasar la salida.
+    Si queda por encima, sobran.<br><br>
+    La previsión da bandazos antes del km 10 porque divide por un recorrido corto. A partir del km 20 se estabiliza.
+    En los primeros kilómetros la banda azul–verde es más estrecha que el error del GPS, así que no decidas con ella.
+  </footer>
+
+</div>
+
+<script>
+const D = {"L":42507.89,"paso_b":1007.41539,"via":[[38.268022,-0.697575,0.0],[38.267631,-0.698578,97.9],[38.267695,-0.699573,185.2],[38.267723,-0.700352,253.5],[38.268004,-0.705974,746.5],[38.268107,-0.707731,900.7],[38.268387,-0.707696,931.9],[38.269154,-0.706299,1080.9],[38.269879,-0.704725,1240.4],[38.270286,-0.703566,1351.5],[38.270829,-0.701677,1527.5],[38.27096,-0.701087,1581.1],[38.271052,-0.700916,1599.2],[38.271238,-0.700096,1673.8],[38.271496,-0.69854,1813.0],[38.271757,-0.696949,1955.2],[38.272082,-0.694908,2137.4],[38.272069,-0.694582,2166.0],[38.272207,-0.694236,2199.9],[38.272779,-0.690821,2505.5],[38.272747,-0.690445,2538.5],[38.272901,-0.690194,2566.3],[38.272843,-0.689938,2589.6],[38.273155,-0.687991,2763.5],[38.27342,-0.686317,2912.9],[38.273984,-0.682969,3212.5],[38.27443,-0.680345,3447.4],[38.274453,-0.679977,3479.7],[38.274534,-0.679773,3499.6],[38.274997,-0.67695,3752.0],[38.275066,-0.676399,3800.7],[38.274396,-0.673452,4069.2],[38.274185,-0.67324,4099.0],[38.274245,-0.672763,4141.4],[38.274107,-0.672394,4177.1],[38.273749,-0.67186,4238.4],[38.273304,-0.67152,4296.1],[38.272779,-0.671295,4357.6],[38.272627,-0.67132,4374.7],[38.272358,-0.67133,4404.5],[38.272184,-0.671186,4427.6],[38.272116,-0.670912,4452.7],[38.272246,-0.670586,4484.7],[38.272464,-0.670514,4509.7],[38.27267,-0.670641,4535.2],[38.272676,-0.670643,4535.8],[38.272828,-0.671104,4579.6],[38.272995,-0.671273,4603.2],[38.273012,-0.671272,4605.1],[38.273031,-0.671271,4607.3],[38.273356,-0.671434,4646.0],[38.273767,-0.67172,4698.1],[38.274054,-0.672086,4743.3],[38.274371,-0.672793,4814.4],[38.274526,-0.67299,4838.8],[38.274501,-0.67338,4873.0],[38.274543,-0.673691,4900.6],[38.275044,-0.676007,5110.7],[38.275165,-0.676363,5144.7],[38.2754,-0.67656,5175.9],[38.275435,-0.676832,5200.0],[38.275271,-0.677086,5228.8],[38.274807,-0.679815,5473.1],[38.274822,-0.68017,5504.2],[38.274704,-0.680433,5530.7],[38.273433,-0.688022,6209.5],[38.273334,-0.688595,6260.9],[38.273043,-0.690271,6411.1],[38.273085,-0.690609,6441.0],[38.272931,-0.690925,6473.5],[38.272351,-0.694386,6783.1],[38.272375,-0.694661,6807.4],[38.272255,-0.694985,6838.7],[38.271914,-0.696933,7013.3],[38.271703,-0.697753,7088.8],[38.271469,-0.699193,7217.5],[38.271287,-0.700155,7304.0],[38.271173,-0.700942,7374.0],[38.271183,-0.701231,7399.4],[38.271072,-0.701785,7449.4],[38.270539,-0.703758,7631.9],[38.270214,-0.704646,7717.6],[38.269662,-0.705988,7850.0],[38.269044,-0.707159,7973.4],[38.26826,-0.70845,8115.9],[38.267855,-0.709041,8184.5],[38.267279,-0.709745,8273.2],[38.264697,-0.712559,8651.2],[38.264699,-0.71365,8746.6],[38.264737,-0.714744,8842.5],[38.264674,-0.716339,8982.2],[38.264571,-0.718588,9179.4],[38.264435,-0.71879,9202.6],[38.264177,-0.719007,9237.0],[38.263579,-0.719137,9304.3],[38.263228,-0.719022,9344.6],[38.2622,-0.717424,9525.0],[38.261512,-0.716353,9646.0],[38.261567,-0.715898,9686.3],[38.261486,-0.715631,9711.3],[38.261262,-0.715463,9740.2],[38.261046,-0.715484,9764.2],[38.260852,-0.715618,9788.8],[38.260799,-0.715467,9803.3],[38.260647,-0.715237,9829.5],[38.260298,-0.71455,9901.0],[38.259961,-0.714027,9960.2],[38.259739,-0.713858,9988.9],[38.259399,-0.713826,10026.8],[38.258991,-0.713888,10072.4],[38.258753,-0.713598,10109.0],[38.258746,-0.713274,10137.4],[38.258994,-0.712915,10179.1],[38.259305,-0.712911,10213.6],[38.259407,-0.712727,10233.3],[38.259291,-0.711595,10333.2],[38.259176,-0.710203,10455.7],[38.259034,-0.708496,10605.9],[38.258783,-0.705811,10842.5],[38.258313,-0.703799,11026.2],[38.258168,-0.703284,11074.1],[38.258083,-0.702792,11118.1],[38.258044,-0.702224,11168.0],[38.258026,-0.701858,11200.1],[38.257828,-0.700983,11279.8],[38.257319,-0.699055,11457.8],[38.257209,-0.698635,11496.5],[38.257001,-0.698134,11546.1],[38.256939,-0.697811,11575.2],[38.256889,-0.697488,11604.0],[38.256853,-0.69731,11620.0],[38.256818,-0.697011,11646.5],[38.257039,-0.693557,11949.8],[38.257102,-0.693106,11989.9],[38.257102,-0.693097,11990.7],[38.25723,-0.692722,12026.5],[38.257456,-0.692433,12062.1],[38.257546,-0.692317,12076.3],[38.257573,-0.691833,12118.8],[38.257658,-0.690462,12239.2],[38.25772,-0.68945,12328.1],[38.257734,-0.689084,12360.1],[38.257784,-0.68874,12390.7],[38.257901,-0.688439,12420.1],[38.258152,-0.688114,12459.9],[38.258422,-0.687939,12493.6],[38.258892,-0.687657,12551.3],[38.259591,-0.687218,12637.9],[38.26007,-0.686901,12697.9],[38.260854,-0.686432,12794.0],[38.261664,-0.686013,12891.2],[38.261879,-0.686106,12916.3],[38.261969,-0.68645,12948.0],[38.262103,-0.687016,12999.8],[38.262113,-0.687035,13001.8],[38.262123,-0.687058,13004.1],[38.262476,-0.687889,13086.7],[38.262921,-0.688479,13158.2],[38.263016,-0.688637,13175.5],[38.262996,-0.688786,13188.7],[38.262407,-0.688836,13254.3],[38.261459,-0.688873,13359.5],[38.261126,-0.688865,13396.4],[38.259679,-0.688547,13559.5],[38.259631,-0.689162,13613.5],[38.259577,-0.689886,13677.2],[38.259577,-0.690411,13723.1],[38.259649,-0.690835,13761.1],[38.259817,-0.691577,13828.7],[38.25998,-0.692186,13885.0],[38.260081,-0.692397,13906.5],[38.260246,-0.692679,13937.3],[38.260407,-0.69293,13965.6],[38.260405,-0.692926,13966.0],[38.260365,-0.693084,13980.5],[38.260195,-0.693052,13999.7],[38.260066,-0.693053,14014.0],[38.259799,-0.693062,14043.5],[38.259293,-0.693179,14100.7],[38.259056,-0.693219,14127.3],[38.258873,-0.693154,14148.4],[38.258225,-0.692996,14221.6],[38.25782,-0.692917,14267.1],[38.257652,-0.692954,14286.0],[38.257533,-0.693168,14309.0],[38.257481,-0.693413,14331.1],[38.257361,-0.695259,14493.3],[38.257323,-0.695681,14530.4],[38.257033,-0.697141,14662.2],[38.257021,-0.697685,14709.8],[38.25705,-0.698016,14739.0],[38.257259,-0.698564,14792.3],[38.25739,-0.699015,14834.3],[38.257742,-0.700293,14952.9],[38.258067,-0.701754,15085.7],[38.258093,-0.702048,15111.6],[38.258113,-0.702337,15137.0],[38.258131,-0.702643,15163.8],[38.258156,-0.702865,15183.5],[38.258273,-0.703289,15222.8],[38.258414,-0.703867,15275.7],[38.258683,-0.704874,15368.8],[38.258891,-0.705798,15452.9],[38.258932,-0.706416,15507.1],[38.259064,-0.707872,15635.5],[38.25918,-0.709157,15748.6],[38.259272,-0.710383,15856.4],[38.259437,-0.712267,16022.4],[38.259488,-0.712955,16082.8],[38.2595,-0.713215,16105.6],[38.259561,-0.71351,16132.3],[38.259853,-0.713754,16171.2],[38.260049,-0.713983,16200.7],[38.260471,-0.714672,16277.1],[38.260736,-0.715245,16335.2],[38.260896,-0.715389,16357.0],[38.261179,-0.715402,16388.5],[38.261582,-0.715472,16433.6],[38.261755,-0.715305,16457.8],[38.264643,-0.712136,16881.7],[38.264966,-0.711788,16928.6],[38.265667,-0.711024,17031.3],[38.265598,-0.709852,17134.2],[38.26528,-0.70302,17733.1],[38.265153,-0.700588,17946.4],[38.265129,-0.699477,18043.6],[38.265588,-0.697692,18207.9],[38.26613,-0.696316,18342.6],[38.266466,-0.695354,18434.7],[38.266728,-0.693732,18579.6],[38.271823,-0.673244,20459.6],[38.272251,-0.671549,20615.3],[38.2722,-0.671275,20640.0],[38.272069,-0.671004,20667.8],[38.272098,-0.670712,20693.5],[38.272278,-0.670502,20720.7],[38.272292,-0.6705,20722.3],[38.272535,-0.670355,20752.0],[38.273779,-0.665505,21198.4],[38.273715,-0.665054,21238.5],[38.273979,-0.664725,21279.5],[38.274628,-0.662117,21518.8],[38.2746,-0.661731,21552.8],[38.274479,-0.661385,21585.9],[38.274631,-0.661028,21621.4],[38.274766,-0.660883,21641.1],[38.274894,-0.660685,21663.4],[38.275072,-0.660329,21700.3],[38.275248,-0.659943,21739.3],[38.275456,-0.659143,21813.0],[38.277147,-0.652394,22432.7],[38.279163,-0.644359,23170.5],[38.279755,-0.64203,23384.6],[38.280423,-0.639456,23621.7],[38.280928,-0.637418,23808.7],[38.281456,-0.635277,24004.9],[38.282991,-0.629273,24557.2],[38.283754,-0.62616,24842.4],[38.284384,-0.623612,25076.1],[38.284405,-0.623188,25113.2],[38.284379,-0.622941,25135.0],[38.284368,-0.62263,25162.3],[38.284533,-0.622434,25187.4],[38.284696,-0.622228,25212.9],[38.284879,-0.62165,25267.4],[38.286109,-0.616838,25710.0],[38.286151,-0.616397,25748.9],[38.286037,-0.616163,25772.9],[38.286083,-0.615871,25799.0],[38.286371,-0.615546,25841.8],[38.286608,-0.614911,25903.2],[38.287303,-0.612189,26153.6],[38.288171,-0.608663,26476.7],[38.288291,-0.60818,26521.1],[38.288777,-0.606106,26710.4],[38.289295,-0.60393,26909.2],[38.289836,-0.601614,27120.5],[38.290789,-0.59763,27484.8],[38.291399,-0.595059,27719.7],[38.29205,-0.592328,27969.3],[38.292557,-0.590243,28160.2],[38.293008,-0.588278,28339.2],[38.294464,-0.584942,28672.8],[38.295328,-0.582964,28870.7],[38.296179,-0.581046,29063.2],[38.296681,-0.579866,29180.5],[38.297029,-0.579067,29260.4],[38.297181,-0.578482,29314.2],[38.297029,-0.578021,29358.0],[38.29698,-0.577605,29394.8],[38.297116,-0.576885,29459.5],[38.296887,-0.575666,29569.1],[38.296429,-0.57314,29795.9],[38.296458,-0.571739,29918.5],[38.296439,-0.571308,29956.2],[38.296288,-0.571193,29975.8],[38.296196,-0.570937,30000.4],[38.29625,-0.570708,30021.3],[38.296436,-0.570401,30055.2],[38.296476,-0.568602,30212.6],[38.296384,-0.568282,30242.4],[38.29617,-0.568029,30274.9],[38.296129,-0.567633,30309.8],[38.296249,-0.5674,30334.2],[38.296737,-0.567051,30396.4],[38.296824,-0.566734,30425.7],[38.296662,-0.56609,30484.9],[38.296675,-0.565435,30542.2],[38.296858,-0.564663,30612.7],[38.297285,-0.563002,30765.5],[38.297501,-0.561635,30887.5],[38.297742,-0.560308,31006.6],[38.29794,-0.55894,31128.3],[38.298204,-0.556826,31315.5],[38.29833,-0.555985,31390.4],[38.298502,-0.554861,31490.6],[38.299294,-0.549222,31991.6],[38.299697,-0.546403,32242.2],[38.299897,-0.544912,32374.5],[38.30045,-0.541724,32660.1],[38.300636,-0.540015,32811.0],[38.300983,-0.537503,33034.0],[38.301469,-0.532664,33460.7],[38.301684,-0.530389,33661.2],[38.301728,-0.529682,33723.2],[38.301902,-0.528841,33799.3],[38.302317,-0.526683,33993.6],[38.302613,-0.525098,34136.0],[38.302871,-0.524205,34219.2],[38.303502,-0.521945,34429.0],[38.303759,-0.52096,34519.7],[38.303836,-0.520523,34558.9],[38.303897,-0.519951,34609.4],[38.303941,-0.519659,34635.4],[38.304042,-0.519353,34664.4],[38.304236,-0.519055,34698.2],[38.304512,-0.518789,34736.7],[38.304741,-0.51864,34765.2],[38.304997,-0.518521,34795.5],[38.305264,-0.51843,34826.2],[38.305645,-0.518365,34868.9],[38.306633,-0.518203,34979.5],[38.306873,-0.518141,35006.6],[38.30853,-0.517736,35194.0],[38.310716,-0.517132,35442.3],[38.311817,-0.516861,35566.8],[38.312357,-0.516712,35628.1],[38.312736,-0.516587,35671.6],[38.313185,-0.516416,35723.6],[38.314189,-0.515941,35842.6],[38.314716,-0.515655,35906.2],[38.315148,-0.515434,35957.9],[38.315529,-0.515252,36003.1],[38.315909,-0.51511,36047.0],[38.316594,-0.51487,36125.9],[38.318399,-0.514244,36333.6],[38.318762,-0.514094,36376.0],[38.319935,-0.513595,36513.3],[38.321511,-0.512914,36698.1],[38.32298,-0.512278,36870.4],[38.324532,-0.511635,37051.6],[38.325603,-0.511217,37176.0],[38.326513,-0.51087,37281.5],[38.326968,-0.510708,37333.9],[38.327341,-0.510549,37377.6],[38.32766,-0.51034,37417.5],[38.327927,-0.510128,37452.4],[38.328179,-0.509888,37487.4],[38.328588,-0.509443,37547.2],[38.329412,-0.508646,37662.2],[38.330047,-0.508096,37747.5],[38.330986,-0.507235,37876.1],[38.33356,-0.505221,38211.7],[38.333924,-0.504889,38261.4],[38.33422,-0.504574,38304.3],[38.33469,-0.50401,38376.1],[38.335203,-0.503269,38462.4],[38.335913,-0.502205,38584.3],[38.336207,-0.501783,38633.5],[38.337135,-0.500429,38790.5],[38.337377,-0.500005,38836.2],[38.337481,-0.499675,38867.3],[38.337662,-0.498593,38964.0],[38.338063,-0.496043,39191.4],[38.338297,-0.494521,39326.9],[38.338338,-0.4942,39355.4],[38.338304,-0.493672,39401.7],[38.338227,-0.493398,39427.1],[38.337609,-0.493237,39497.2],[38.337747,-0.492542,39559.8],[38.337807,-0.492209,39589.7],[38.337987,-0.490981,39698.9],[38.338091,-0.490701,39726.0],[38.338255,-0.490414,39757.0],[38.338226,-0.49027,39769.9],[38.338616,-0.489389,39858.3],[38.338671,-0.489065,39887.3],[38.338614,-0.488803,39911.1],[38.338527,-0.488613,39930.3],[38.338353,-0.488282,39965.1],[38.338345,-0.487912,39997.5],[38.338139,-0.487418,40046.3],[38.33756,-0.486843,40128.0],[38.337278,-0.486574,40167.1],[38.337118,-0.486436,40188.6],[38.337144,-0.486186,40210.7],[38.337255,-0.485786,40247.7],[38.337357,-0.485427,40281.1],[38.337433,-0.485268,40297.3],[38.337529,-0.485005,40322.7],[38.337691,-0.484521,40368.6],[38.337779,-0.484278,40392.0],[38.337896,-0.483905,40427.1],[38.33802,-0.483555,40460.7],[38.338213,-0.482979,40515.4],[38.338463,-0.483124,40545.9],[38.338362,-0.483413,40573.6],[38.338134,-0.484126,40640.8],[38.33798,-0.484577,40683.8],[38.337874,-0.484908,40715.0],[38.33777,-0.48527,40748.8],[38.337724,-0.485369,40758.7],[38.337608,-0.485433,40772.8],[38.337446,-0.485425,40790.8],[38.337356,-0.485566,40806.7],[38.33728,-0.485807,40829.4],[38.337192,-0.486105,40857.2],[38.33717,-0.486301,40874.4],[38.33746,-0.486614,40916.8],[38.338116,-0.487265,41009.2],[38.338429,-0.487834,41069.8],[38.338645,-0.487999,41097.8],[38.338997,-0.488589,41162.5],[38.339234,-0.488229,41203.6],[38.339399,-0.488006,41230.3],[38.339702,-0.487683,41274.3],[38.340166,-0.487305,41335.4],[38.340413,-0.487095,41368.4],[38.340631,-0.486916,41397.2],[38.340953,-0.486632,41440.7],[38.341169,-0.486424,41470.8],[38.341355,-0.486222,41498.0],[38.34156,-0.485986,41528.8],[38.341642,-0.485886,41541.3],[38.341828,-0.485675,41569.0],[38.341957,-0.48549,41590.7],[38.342048,-0.485351,41606.4],[38.342167,-0.485147,41628.6],[38.34251,-0.484333,41709.3],[38.343177,-0.482561,41881.0],[38.343718,-0.481256,42010.0],[38.343986,-0.480615,42073.4],[38.344075,-0.480368,42097.1],[38.344103,-0.480227,42109.8],[38.344141,-0.479982,42131.6],[38.34415,-0.479787,42148.8],[38.343785,-0.479593,42192.7],[38.342576,-0.479055,42334.9],[38.342221,-0.478978,42374.8],[38.342185,-0.479036,42381.3],[38.342177,-0.479096,42386.6],[38.342199,-0.479202,42396.2],[38.342425,-0.4794,42426.7],[38.342579,-0.479516,42446.6],[38.343097,-0.479759,42507.9]],"pk":[["1a",38.268737,-0.707058,1000.0],["1b",38.268775,-0.706988,1007.4],["2a",38.271837,-0.696447,2000.0],["2b",38.271863,-0.696281,2014.8],["3a",38.273584,-0.685343,3000.0],["3b",38.273626,-0.685095,3022.2],["4a",38.274569,-0.674212,4000.0],["4b",38.274495,-0.673886,4029.7],["5a",38.27478,-0.674786,5000.0],["5b",38.274869,-0.675195,5037.1],["6a",38.273825,-0.68568,6000.0],["6b",38.273742,-0.686177,6044.5],["7a",38.27194,-0.696784,7000.0],["7b",38.271806,-0.697352,7051.9],["8a",38.268897,-0.7074,8000.0],["8b",38.268571,-0.707937,8059.3],["9a",38.264665,-0.716542,9000.0],["9b",38.26463,-0.717303,9066.7],["10a",38.259639,-0.713849,10000.0],["10b",38.258979,-0.713874,10074.2],["11a",38.25838,-0.704086,11000.0],["11b",38.258153,-0.7032,11081.6],["12a",38.257135,-0.692999,12000.0],["12b",38.257554,-0.692173,12089.0],["13a",38.262105,-0.687018,13000.0],["13b",38.262537,-0.687969,13096.4],["14a",38.260192,-0.693052,14000.0],["14b",38.259265,-0.693183,14103.8],["15a",38.257857,-0.700812,15000.0],["15b",38.258093,-0.702044,15111.2],["16a",38.259415,-0.712013,16000.0],["16b",38.25953,-0.713359,16118.6],["17a",38.265453,-0.711257,17000.0],["17b",38.265604,-0.709944,17126.1],["18a",38.26514,-0.699976,18000.0],["18b",38.26538,-0.698501,18133.5],["19a",38.267867,-0.68915,19000.0],["19b",38.268249,-0.687615,19140.9],["20a",38.270578,-0.678253,20000.0],["20b",38.27098,-0.676636,20148.3],["21a",38.273226,-0.667661,21000.0],["21b",38.27366,-0.665969,21155.7],["22a",38.275966,-0.657107,22000.0],["22b",38.276411,-0.65533,22163.1],["23a",38.278697,-0.646216,23000.0],["23b",38.279163,-0.644359,23170.6],["24a",38.281443,-0.635331,24000.0],["24b",38.281937,-0.633396,24178.0],["25a",38.284179,-0.624442,25000.0],["25b",38.28452,-0.62245,25185.4],["26a",38.286877,-0.613859,26000.0],["26b",38.287408,-0.611761,26192.8],["27a",38.289527,-0.602935,27000.0],["27b",38.290044,-0.600743,27200.2],["28a",38.292132,-0.591993,28000.0],["28b",38.292677,-0.589722,28207.6],["29a",38.2959,-0.581676,29000.0],["29b",38.296832,-0.57952,29215.0],["30a",38.296198,-0.570941,30000.0],["30b",38.296446,-0.568496,30222.5],["31a",38.297729,-0.560382,31000.0],["31b",38.298083,-0.557793,31229.9],["32a",38.299308,-0.549128,32000.0],["32b",38.299689,-0.546458,32237.3],["33a",38.30093,-0.537886,33000.0],["33b",38.301223,-0.535114,33244.7],["34a",38.30233,-0.526611,34000.0],["34b",38.30297,-0.523851,34252.1],["35a",38.306814,-0.518156,35000.0],["35b",38.309107,-0.517576,35259.5],["36a",38.315503,-0.515264,36000.0],["36b",38.31782,-0.514445,36267.0],["37a",38.32409,-0.511818,37000.0],["37b",38.326452,-0.510893,37274.4],["38a",38.331936,-0.506491,38000.0],["38b",38.334064,-0.50474,38281.8],["39a",38.337725,-0.49819,39000.0],["39b",38.338232,-0.494945,39289.2],["40a",38.338334,-0.487886,40000.0],["40b",38.33743,-0.485275,40296.6],["41a",38.338051,-0.487201,41000.0],["41b",38.339928,-0.487499,41304.0],["42a",38.343676,-0.481357,42000.0],["42b",38.342775,-0.479143,42311.4]],"salida":[38.268022,-0.697575],"meta":[38.343097,-0.479759]};
+const VIA = D.via, L = D.L, PASO_B = D.paso_b, OBJ = 42195;
+
+const lat0 = VIA[0][0], lon0 = VIA[0][1];
+const KLAT = 111132.95, KLON = 111320 * Math.cos(lat0 * Math.PI / 180);
+const XY = VIA.map(p => [(p[1] - lon0) * KLON, (p[0] - lat0) * KLAT, p[2]]);
+
+// El trazado se cruza consigo mismo en Elche y en el bucle final de Alicante:
+// dos pasadas distintas pueden quedar a pocos metros. Buscamos varios candidatos
+// y elegimos con el kilómetro declarado o con la continuidad de la lectura anterior.
+function candidatos(lat, lon){
+  const px = (lon - lon0) * KLON, py = (lat - lat0) * KLAT;
+  const todos = [];
+  for (let i = 0; i < XY.length - 1; i++){
+    const [ax, ay, as] = XY[i], [bx, by, bs] = XY[i+1];
+    const vx = bx - ax, vy = by - ay, len2 = vx*vx + vy*vy;
+    let t = len2 ? ((px-ax)*vx + (py-ay)*vy) / len2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const dx = px - (ax + t*vx), dy = py - (ay + t*vy);
+    todos.push({d: Math.hypot(dx, dy), s: as + t*(bs - as)});
+  }
+  todos.sort((p, q) => p.d - q.d);
+  const sel = [];
+  for (const c of todos){
+    if (sel.length >= 5) break;
+    if (sel.every(x => Math.abs(x.s - c.s) > 150)) sel.push(c);
+  }
+  return sel;
+}
+
+function localizar(lat, lon, referencia){
+  const c = candidatos(lat, lon);
+  let elegido = c[0], ambiguo = false;
+  if (referencia != null){
+    let mejor = Infinity;
+    for (const x of c){
+      const dist = Math.abs(x.s - referencia);
+      if (dist < mejor && x.d < c[0].d + 60){ mejor = dist; elegido = x; }
+    }
+  } else if (c.length > 1 && c[1].d < c[0].d + 30){
+    ambiguo = true;
+  }
+  return {s: elegido.s, desvio: elegido.d, ambiguo};
+}
+
+const fmt = (n, d=0) => n.toLocaleString('es-ES',{minimumFractionDigits:d, maximumFractionDigits:d});
+const sig = n => (n >= 0 ? '+' : '−') + fmt(Math.abs(n), 0) + ' m';
+const $ = id => document.getElementById(id);
+
+let sActual = null, watchId = null, promediando = false, buffer = [], wake = null;
+
+function pintar(s, desvio, prec){
+  sActual = s;
+  $('metro').textContent = fmt(s,0) + ' m';
+  $('kmof').textContent = fmt(s * 42.195 / L, 3);
+  $('falta').textContent = fmt(L - s, 0) + ' m';
+  $('desvio').textContent = fmt(desvio,0) + ' m';
+  if (prec != null) $('prec').textContent = '± ' + fmt(prec,0) + ' m';
+
+  let k = Math.round(s / PASO_B); k = Math.max(1, Math.min(42, k));
+  const sA = k * 1000, sB = k * PASO_B;
+  $('etA').textContent = k + 'a';
+  $('etB').textContent = k + 'b';
+  $('dA').textContent = sig(s - sA);
+  $('dB').textContent = sig(s - sB);
+
+  // La barra muestra de -50% a +150% de la banda: el azul cae al 25% y el verde al 75%,
+  // así que queda sitio para ver medio ancho de banda de margen a cada lado.
+  const f = (s - sA) / (sB - sA);
+  const bruto = (f + 0.5) / 2;
+  const pos = Math.max(0.012, Math.min(0.988, bruto));
+  const m = $('marca');
+  m.style.left = (pos * 100) + '%';
+  m.classList.toggle('tope-izq', bruto < 0.012);
+  m.classList.toggle('tope-der', bruto > 0.988);
+
+  const eb = $('estadoBanda');
+  const extremo = (bruto < 0.012 || bruto > 0.988) ? ' La marca está topada: fíate de las cifras.' : '';
+  if (f < -0.02){
+    eb.textContent = 'Antes del ' + k + 'a. Sobrarían metros.' + extremo;
+    eb.style.color = 'var(--warn)';
+  } else if (f > 1.02){
+    eb.textContent = 'Pasado el ' + k + 'b. Faltarían metros.' + extremo;
+    eb.style.color = 'var(--bad)';
+  } else {
+    eb.textContent = 'Dentro de la banda, entre ' + k + 'a y ' + k + 'b.';
+    eb.style.color = 'var(--good)';
+  }
+  $('btnReg').disabled = false;
+}
+
+function arrancarGps(){
+  if (!navigator.geolocation){
+    $('estado').textContent = 'Este navegador no da acceso al GPS.';
+    return;
+  }
+  $('estado').textContent = 'Buscando satélites…';
+  watchId = navigator.geolocation.watchPosition(pos => {
+    const {latitude:la, longitude:lo, accuracy:ac} = pos.coords;
+    const km = parseFloat($('kmHom').value);
+    const ref = isFinite(km) && km > 0 ? km * PASO_B : sActual;
+    const r = localizar(la, lo, ref);
+    if (promediando){ buffer.push(r.s); $('estado').textContent = 'Promediando… ' + buffer.length + ' lecturas'; }
+    else if (r.ambiguo) $('estado').textContent = 'El trazado pasa dos veces por aquí. Escribe el kilómetro para desambiguar.';
+    else $('estado').textContent = 'GPS activo';
+    pintar(r.s, r.desvio, ac);
+  }, err => {
+    $('estado').textContent = err.code === 1
+      ? 'Permiso de ubicación denegado. Actívalo en los ajustes del navegador.'
+      : 'Sin señal de GPS (' + err.message + ')';
+  }, {enableHighAccuracy:true, maximumAge:0, timeout:20000});
+
+  $('btnGps').textContent = 'GPS activo';
+  $('btnGps').disabled = true;
+  $('btnProm').disabled = false;
+
+  if ('wakeLock' in navigator){
+    navigator.wakeLock.request('screen').then(w => wake = w).catch(()=>{});
+  }
+}
+
+$('btnGps').addEventListener('click', arrancarGps);
+
+$('btnProm').addEventListener('click', () => {
+  if (promediando) return;
+  promediando = true; buffer = [];
+  $('btnProm').disabled = true;
+  setTimeout(() => {
+    promediando = false;
+    $('btnProm').disabled = false;
+    if (!buffer.length){ $('estado').textContent = 'No llegó ninguna lectura'; return; }
+    const o = buffer.slice().sort((x,y) => x-y);
+    const med = o.length % 2 ? o[(o.length-1)/2] : (o[o.length/2-1] + o[o.length/2]) / 2;
+    const disp = o[o.length-1] - o[0];
+    pintar(med, 0, null);
+    $('desvio').textContent = '—';
+    $('estado').textContent = 'Promedio de ' + o.length + ' lecturas · dispersión ' + fmt(disp,0) + ' m';
+    calcular();
+  }, 30000);
+});
+
+let ultimaProy = null;
+function calcular(){
+  const k = parseFloat($('kmHom').value);
+  if (!isFinite(k) || k <= 0 || sActual == null){
+    $('proy').textContent = '—';
+    $('veredicto').textContent = 'Introduce el kilómetro que te cante el homologador.';
+    $('veredicto').style.color = 'var(--muted)';
+    ultimaProy = null;
+    return;
+  }
+  const proy = k * 1000 * L / sActual;
+  const dif = proy - OBJ;
+  ultimaProy = proy;
+  $('proy').textContent = fmt(proy,0) + ' m';
+  const fiable = sActual > 20000 ? '' : (sActual > 10000 ? ' Todavía poco fiable a esta altura.' : ' Dato orientativo: aún es pronto para fiarse.');
+  if (Math.abs(dif) < 25){
+    $('veredicto').textContent = 'Cuadra. Diferencia de ' + sig(dif) + ' sobre los 42.195 m.' + fiable;
+    $('veredicto').style.color = 'var(--good)';
+  } else if (dif < 0){
+    $('veredicto').textContent = 'Faltan ' + fmt(-dif,0) + ' m. Habría que alejar la meta o retrasar la salida.' + fiable;
+    $('veredicto').style.color = 'var(--bad)';
+  } else {
+    $('veredicto').textContent = 'Sobran ' + fmt(dif,0) + ' m. Habría que adelantar la meta o la salida.' + fiable;
+    $('veredicto').style.color = 'var(--warn)';
+  }
+}
+$('btnCalc').addEventListener('click', calcular);
+$('kmHom').addEventListener('input', calcular);
+
+let paradas = [];
+try { paradas = JSON.parse(localStorage.getItem('paradasV06') || '[]'); } catch(e){ paradas = []; }
+
+function guardar(){ try { localStorage.setItem('paradasV06', JSON.stringify(paradas)); } catch(e){} }
+
+function pintarTabla(){
+  const tb = $('tbody');
+  if (!paradas.length){
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);font-family:var(--sans)">Sin paradas todavía</td></tr>';
+    $('btnCsv').disabled = true; return;
+  }
+  tb.innerHTML = paradas.map(p => {
+    const cls = p.proy == null ? '' : Math.abs(p.proy - OBJ) < 25 ? 'ok' : p.proy < OBJ ? 'ko' : 'at';
+    const pr = p.proy == null ? '—' : '<span class="pill ' + cls + '">' + fmt(p.proy,0) + '</span>';
+    return '<tr><td>' + p.hora + '</td><td>' + (p.km ?? '—') + '</td><td>' + fmt(p.s,0) +
+           '</td><td>' + sig(p.dA) + '</td><td>' + sig(p.dB) + '</td><td>' + pr + '</td></tr>';
+  }).join('');
+  $('btnCsv').disabled = false;
+}
+pintarTabla();
+
+$('btnReg').addEventListener('click', () => {
+  if (sActual == null) return;
+  let k = Math.round(sActual / PASO_B); k = Math.max(1, Math.min(42, k));
+  const km = parseFloat($('kmHom').value);
+  paradas.push({
+    hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    km: isFinite(km) ? km : null,
+    s: sActual, pk: k,
+    dA: sActual - k*1000, dB: sActual - k*PASO_B,
+    proy: ultimaProy
+  });
+  guardar(); pintarTabla();
+});
+
+$('btnBorrar').addEventListener('click', () => {
+  paradas = []; guardar(); pintarTabla();
+});
+
+$('btnCsv').addEventListener('click', () => {
+  const cab = 'hora;km_homologador;metro_trazado;pk;dist_a_A_m;dist_a_B_m;longitud_previsible_m\n';
+  const cuerpo = paradas.map(p => [p.hora, p.km ?? '', p.s.toFixed(1), p.pk,
+      p.dA.toFixed(1), p.dB.toFixed(1), p.proy == null ? '' : p.proy.toFixed(1)]
+      .join(';').replace(/\./g, ',')).join('\n');
+  const blob = new Blob(['﻿' + cab + cuerpo], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'homologacion_V06.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+
+if ('serviceWorker' in navigator && location.protocol === 'https:'){
+  navigator.serviceWorker.register('sw.js').then(() => {
+    $('estado').textContent = 'Lista para usar sin cobertura';
+  }).catch(()=>{});
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && 'wakeLock' in navigator && watchId != null){
+    navigator.wakeLock.request('screen').then(w => wake = w).catch(()=>{});
+  }
+});
+</script>
+
+</body>
+</html>
