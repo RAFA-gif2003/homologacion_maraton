@@ -104,6 +104,7 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
 .velo .cuenta{font-family:var(--mono);font-size:84px;font-weight:700;color:var(--teal);
   line-height:1;margin:14px 0 4px;border:0;background:none;padding:0;display:block}
 .veloEstado{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+#previo{width:100%;max-height:30vh;object-fit:cover;margin-top:12px;border:1px solid var(--line);background:#000}
 .velo.midiendo .veloCaja{border-color:var(--warn)}
 .velo.midiendo .veloTit{color:var(--warn)}
 
@@ -320,10 +321,12 @@ details.panel>*:last-child{margin-bottom:14px}
         Colócate con el móvil sobre la marca que acaba de poner el homologador,
         a la altura habitual, y no te muevas hasta que acabe la cuenta.
       </div>
+      <video id="previo" playsinline autoplay muted hidden></video>
       <div class="cuenta" id="cuentaAtras" hidden>30</div>
       <div class="veloEstado" id="veloEstado" hidden>0 lecturas</div>
       <div class="row" style="margin-top:16px">
         <button id="btnVeloSi" class="primary">Sí, empezar</button>
+        <button id="btnVeloFoto" hidden>📷 Disparar ahora</button>
         <button id="btnVeloNo">Todavía no</button>
       </div>
     </div>
@@ -646,10 +649,50 @@ function abrirVelo(){
   $('btnVeloNo').textContent = 'Todavía no';
 }
 
+/* Cámara dentro de la propia página: el botón normal abre la app de fotos, el
+   navegador se va a segundo plano y el GPS deja de dar lecturas. Así no. */
+let flujo = null, yaDisparo = false;
+
+async function abrirCamara(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+  try {
+    flujo = await navigator.mediaDevices.getUserMedia({
+      video: {facingMode: {ideal: 'environment'}, width: {ideal: 1600}}, audio: false});
+    $('previo').srcObject = flujo;
+    $('previo').hidden = false;
+    $('btnVeloFoto').hidden = false;
+    return true;
+  } catch(e){ flujo = null; return false; }
+}
+
+function cerrarCamara(){
+  if (flujo){ flujo.getTracks().forEach(p => p.stop()); flujo = null; }
+  $('previo').srcObject = null;
+  $('previo').hidden = true;
+  $('btnVeloFoto').hidden = true;
+}
+
+async function disparar(){
+  if (!flujo) return false;
+  const v = $('previo');
+  if (!v.videoWidth) return false;
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+  if (!b) return false;
+  yaDisparo = true;
+  $('veloEstado').textContent = 'Foto tomada · sigue sin moverte';
+  return guardarDisparo(b, true);
+}
+
+$('btnVeloFoto').addEventListener('click', disparar);
+
 function cerrarVelo(){
   $('velo').hidden = true;
   $('velo').classList.remove('midiendo');
   if (tempo){ clearInterval(tempo); tempo = null; }
+  cerrarCamara();
   promediando = false;
   $('btnProm').disabled = false;
 }
@@ -668,11 +711,15 @@ $('btnVeloSi').addEventListener('click', () => {
   $('cuentaAtras').hidden = false;
   $('veloEstado').hidden = false;
   finMedida = Date.now() + 30000;
+  yaDisparo = false;
+  abrirCamara();            // si el permiso falla, se mide igual y sin foto
 
   tempo = setInterval(() => {
     const quedan = Math.max(0, Math.ceil((finMedida - Date.now()) / 1000));
     $('cuentaAtras').textContent = quedan;
-    $('veloEstado').textContent = buffer.length + (buffer.length === 1 ? ' lectura' : ' lecturas');
+    if (!yaDisparo) $('veloEstado').textContent = buffer.length + (buffer.length === 1 ? ' lectura' : ' lecturas');
+    // A mitad de cuenta: la posición ya se ha asentado y aún queda margen por si falla.
+    if (!yaDisparo && flujo && quedan <= 15) disparar();
     if (quedan <= 0) rematarMedida();
   }, 250);
 });
@@ -683,6 +730,7 @@ function rematarMedida(){
   $('btnProm').disabled = false;
   $('velo').hidden = true;
   $('velo').classList.remove('midiendo');
+  cerrarCamara();
 
   if (!buffer.length){
     $('estado').textContent = 'No llegó ninguna lectura del GPS.';
@@ -897,7 +945,7 @@ async function pintarTira(){
   if (!fotos.length){ t.innerHTML = ''; return; }
   t.innerHTML = fotos.slice(-12).map(f =>
     '<figure><img alt="' + f.etiqueta + '" src="' + URL.createObjectURL(f.blob) + '">' +
-    '<figcaption>' + f.etiqueta + (f.usuario ? ' · ' + f.usuario : '') + '</figcaption></figure>').join('');
+    '<figcaption>' + f.etiqueta + (f.m30 ? ' · 30s' : '') + (f.usuario ? ' · ' + f.usuario : '') + '</figcaption></figure>').join('');
   const bytes = fotos.reduce((a, f) => a + f.blob.size, 0);
   const peso = bytes < 1048576 ? fmt(bytes / 1024, 0) + ' KB' : fmt(bytes / 1048576, 1) + ' MB';
   av.textContent = fotos.length === 1
@@ -907,10 +955,10 @@ async function pintarTira(){
 
 abrirBD().then(x => { bd = x; pintarTira(); });
 
-$('camara').addEventListener('change', async e => {
-  const f = e.target.files && e.target.files[0];
-  e.target.value = '';
-  if (!f || !bd) return;
+/* Una sola ruta para todas las fotos: la del botón y la que se dispara durante
+   la medición. m30 sólo marca el nombre del archivo, nunca la imagen. */
+async function guardarDisparo(fuente, m30){
+  if (!bd) return;
   const etq = etiquetaPunto();
   const ahora = new Date();
   const yo = quien();
@@ -919,28 +967,34 @@ $('camara').addEventListener('change', async e => {
     + ' · ' + yo
     + (ultimaCoord ? ' · ' + ultimaCoord.la.toFixed(6) + ', ' + ultimaCoord.lo.toFixed(6) : '');
   try {
-    const blob = await procesarFoto(f, {titulo: etq + ' · Maratón Elche-Alicante V06', detalle});
+    const blob = await procesarFoto(fuente, {titulo: etq + ' · Maratón Elche-Alicante V06', detalle});
     const sello = ahora.toISOString().slice(0,16).replace('T','_').replace(/[:-]/g,'');
+    const nombre = etq.replace(/[^0-9A-Za-z]+/g,'-') + '_' + yo + (m30 ? '_M30' : '') + '_' + sello + '.jpg';
     await guardarFoto({
-      etiqueta: etq,
-      usuario: yo,
-      nombre: etq.replace(/[^0-9A-Za-z]+/g,'-') + '_' + yo + '_' + sello + '.jpg',
+      etiqueta: etq, usuario: yo, m30: !!m30, nombre: nombre,
       s: sActual, lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null,
       hora: ahora.toISOString(), blob
     });
     pintarTira();
     encolarFoto({
       hora: ahora.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
-      usuario: yo, etiqueta: etq,
-      nombre: etq.replace(/[^0-9A-Za-z]+/g,'-') + '_' + yo + '_' + sello + '.jpg',
+      usuario: yo, etiqueta: etq, nombre: nombre, m30: !!m30,
       s: sActual, peso: blob.size,
       lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null
     });
     sincronizar(true);
+    return true;
   } catch(err){
     $('avisoFotos').hidden = false;
     $('avisoFotos').textContent = 'No se pudo procesar la foto: ' + err.message;
+    return false;
   }
+}
+
+$('camara').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (f) guardarDisparo(f, false);
 });
 
 $('btnReg').addEventListener('click', () => {
