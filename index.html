@@ -156,7 +156,7 @@ details.panel>*:last-child{margin-bottom:14px}
   <div class="cabecera">
     <h1>Control de homologación</h1>
     <p class="sub">Maratón Elche–Alicante · V06 · <span class="num">42.507,89 m</span> · <span id="quienCab">—</span>
-      · <span class="num" id="version">v16</span></p>
+      · <span class="num" id="version">v17</span></p>
   </div>
 
   <!-- Todo lo que se usa en cada parada cabe aquí, sin bajar la pantalla. -->
@@ -1273,8 +1273,27 @@ document.addEventListener('visibilitychange', () => {
 </script>
 
 <script>
+// Desde el icono de la pantalla de inicio no hay barra de recarga, así que la
+// app comprueba ella misma si hay versión nueva cada vez que se abre, y se
+// reinicia una sola vez cuando entra.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+  let recargado = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (recargado) return;
+    recargado = true;
+    location.reload();
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => {
+        reg.update().catch(()=>{});
+        // y otra comprobación al volver a primer plano
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) reg.update().catch(()=>{});
+        });
+      })
+      .catch(()=>{});
+  });
 }
 </script>
 </body>
