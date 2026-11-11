@@ -1,5 +1,5 @@
 // Cachea la app entera en la primera visita. A partir de ahí funciona sin red.
-const CACHE = 'homologacion-v06-6';
+const CACHE = 'homologacion-v06-7';
 const FICHEROS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

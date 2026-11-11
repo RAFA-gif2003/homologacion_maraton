@@ -27,7 +27,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--sans);margin:0;
   padding-left:max(14px,env(safe-area-inset-left,0px));
   padding-right:max(14px,env(safe-area-inset-right,0px));
   padding-block:12px 28px;font-size:15px;line-height:1.45}
-.wrap{display:flex;flex-direction:column;gap:12px;max-width:560px;margin:0 auto}
+.wrap{display:flex;flex-direction:column;gap:10px;max-width:560px;margin:0 auto}
 .cabecera{border-top:4px solid var(--teal);padding-top:12px}
 h1{font-family:var(--cond);font-size:21px;margin:0;letter-spacing:.02em;text-transform:uppercase;
   color:var(--crema);font-weight:700;line-height:1.1}
@@ -42,7 +42,7 @@ h1{font-family:var(--cond);font-size:21px;margin:0;letter-spacing:.02em;text-tra
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .row>*{flex:1 1 150px;min-width:0}
 button{font:inherit;font-family:var(--cond);text-transform:uppercase;letter-spacing:.05em;
-  font-weight:700;font-size:14px;padding:14px;border-radius:0;border:1px solid var(--teal);
+  font-weight:700;font-size:14px;padding:12px;border-radius:0;border:1px solid var(--teal);
   background:transparent;color:var(--fg);cursor:pointer;width:100%}
 button.primary{background:var(--teal);color:#fff;border-color:var(--teal)}
 button:disabled{opacity:.35}
@@ -91,6 +91,30 @@ label.boton input{position:absolute;width:1px;height:1px;opacity:0;pointer-event
 .kv:last-child{border-bottom:0}
 .kv span:last-child{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:650}
 footer{font-size:11.5px;color:var(--muted);line-height:1.5}
+
+/* ---- pantalla principal: lo de cada parada, sin bajar ---- */
+.foco{border-top:3px solid var(--teal)}
+.cinta{display:flex;gap:4px;margin-top:12px}
+.cinta>div{flex:1 1 0;min-width:0;background:var(--panel2);border:1px solid var(--line);
+  padding:6px 5px;text-align:center}
+.cinta .lab{display:block;font-size:9.5px;letter-spacing:.06em;margin-bottom:2px}
+.cinta .mid{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acciones{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.acciones .grande{font-size:16px;line-height:1.25;padding:14px 10px;min-height:92px}
+label.boton.grande{display:flex;align-items:center;justify-content:center}
+
+/* ---- secciones plegadas: lo que casi nunca se toca ---- */
+details.panel{padding:0}
+details.panel>summary{font-family:var(--cond);text-transform:uppercase;letter-spacing:.08em;
+  font-weight:700;font-size:12.5px;color:var(--cian);padding:14px;cursor:pointer;
+  list-style:none;display:flex;align-items:center;gap:8px}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::after{content:"▾";margin-left:auto;color:var(--muted);font-size:14px}
+details.panel[open]>summary::after{content:"▴"}
+details.panel>*:not(summary){margin-left:14px;margin-right:14px}
+details.panel>*:last-child{margin-bottom:14px}
+.cuenta{font-family:var(--mono);font-size:11px;background:var(--panel2);border:1px solid var(--line);
+  padding:2px 7px;color:var(--fg);letter-spacing:0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -100,12 +124,103 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
 
   <div class="cabecera">
     <h1>Control de homologación</h1>
-    <p class="sub">2ª Maratón Internacional Elche–Alicante · trazado V06 · <span class="num">42.507,89 m</span> dibujados</p>
+    <p class="sub">Maratón Elche–Alicante · V06 · <span class="num">42.507,89 m</span> · <span id="quienCab">—</span></p>
   </div>
 
-  <div class="panel">
-    <div class="lab">Quién está midiendo</div>
-    <div class="grid2" style="margin-top:8px">
+  <!-- Todo lo que se usa en cada parada cabe aquí, sin bajar la pantalla. -->
+  <div class="panel foco">
+    <div class="row">
+      <button id="btnGps" class="primary">Activar GPS</button>
+      <button id="btnProm" disabled>Promediar 30 s</button>
+    </div>
+
+    <div class="cinta">
+      <div><span class="lab">Metro</span><span class="mid" id="metro">—</span></div>
+      <div><span class="lab">Km of.</span><span class="mid" id="kmof">—</span></div>
+      <div><span class="lab">A meta</span><span class="mid" id="falta">—</span></div>
+      <div><span class="lab">± GPS</span><span class="mid" id="prec">—</span></div>
+    </div>
+
+    <div class="banda">
+      <div class="ta" id="etA">—</div>
+      <div class="tb" id="etB">—</div>
+      <div class="fuera" style="left:0;width:25%"></div>
+      <div class="fuera" style="right:0;width:25%"></div>
+      <div class="pista"></div>
+      <div class="tope" style="left:25%"></div>
+      <div class="tope" style="left:75%"></div>
+      <div class="marca" id="marca" style="left:50%"></div>
+    </div>
+    <div class="estadoBanda" id="estadoBanda" style="color:var(--muted)">Sin posición todavía</div>
+    <div class="grid2" style="margin-top:6px">
+      <div><span class="lab">Al azul</span> <span class="mid" id="dA" style="color:var(--a);font-size:19px">—</span></div>
+      <div><span class="lab">Al verde</span> <span class="mid" id="dB" style="color:var(--b);font-size:19px">—</span></div>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <input id="kmHom" type="number" inputmode="decimal" step="0.001" placeholder="Km del homologador">
+      <button id="btnCalc">Calcular</button>
+    </div>
+    <div class="kv" style="margin-top:8px">
+      <span>Longitud final previsible</span><span class="mid" id="proy">—</span>
+    </div>
+    <div class="veredicto" id="veredicto" style="margin-top:2px;color:var(--muted)">
+      Escribe el kilómetro que te cante el homologador.
+    </div>
+
+    <div class="acciones">
+      <button id="btnReg" class="primary grande" disabled>✓<br>Registrar<br>parada</button>
+      <label class="boton grande" for="camara">📷<br>Hacer<br>foto
+        <input id="camara" type="file" accept="image/*" capture="environment">
+      </label>
+    </div>
+    <div class="aviso" id="avisoFotos" hidden></div>
+  </div>
+
+  <details class="panel">
+    <summary>Paradas registradas <span class="cuenta" id="cuentaPar">0</span></summary>
+    <div class="tira" id="tira" hidden></div>
+    <div class="tabla-wrap" style="margin-top:10px">
+      <table id="tabla">
+        <thead><tr><th>Hora</th><th>Quién</th><th>Km hom.</th><th>Metro</th><th>vs A</th><th>vs B</th><th>Cota</th><th>Previsión</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="8" style="text-align:center;color:var(--muted);font-family:var(--sans)">Sin paradas todavía</td></tr></tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="btnCsv" disabled>Descargar CSV</button>
+      <button id="btnZip" disabled>Descargar todo (fotos + CSV)</button>
+    </div>
+    <button id="btnBorrar" style="margin-top:10px">Borrar registro y fotos</button>
+  </details>
+
+  <details class="panel">
+    <summary>Hoja de Google <span class="cuenta" id="pend">0</span></summary>
+    <div class="kv" style="margin-top:10px">
+      <span>Último envío</span><span id="ultEnv" style="font-family:var(--sans)">—</span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnSync" class="primary">Sincronizar ahora</button>
+      <button id="btnUrl">Cambiar enlace</button>
+    </div>
+    <div id="cajaUrl" hidden style="margin-top:10px">
+      <label class="lab">URL del Apps Script (termina en /exec)
+        <input id="urlApi" type="url" placeholder="https://script.google.com/macros/s/…/exec" style="margin-top:4px;font-size:12px">
+      </label>
+      <div class="row" style="margin-top:8px">
+        <button id="btnUrlOk" class="primary">Guardar</button>
+        <button id="btnUrlNo">Cancelar</button>
+      </div>
+    </div>
+    <div class="aviso" id="syncInfo">Cada parada se guarda en el móvil y se envía sola cuando hay cobertura.</div>
+    <div class="aviso">
+      Las fotos se quedan dentro del navegador del móvil: a la hoja sólo va su nombre y quién la hizo.
+      Al acabar, descarga el paquete y súbelo a Drive de una vez.
+    </div>
+  </details>
+
+  <details class="panel">
+    <summary>Quién está midiendo <span class="cuenta" id="quienPill">—</span></summary>
+    <div class="grid2" style="margin-top:10px">
       <label class="lab">Acrónimo (2–4 letras)
         <input id="quien" maxlength="4" autocapitalize="characters" placeholder="RB" style="margin-top:4px;text-transform:uppercase">
       </label>
@@ -127,31 +242,12 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
         <button id="btnPinNo">Cancelar</button>
       </div>
     </div>
-  </div>
+  </details>
 
-  <div class="panel">
-    <div class="row">
-      <button id="btnGps" class="primary">Activar GPS</button>
-      <button id="btnProm" disabled>Promediar 30 s</button>
-    </div>
-    <div class="kv" style="margin-top:12px">
-      <span>Estado</span><span id="estado" style="font-family:var(--sans)">En espera</span>
-    </div>
-    <div class="kv">
-      <span>Precisión GPS</span><span id="prec">—</span>
-    </div>
-    <div class="kv">
-      <span>Separación del eje</span><span id="desvio">—</span>
-    </div>
-  </div>
-
-  <div class="panel">
-    <div class="lab">Metro del trazado</div>
-    <div class="big" id="metro">—</div>
-    <div class="grid3" style="margin-top:10px">
-      <div><div class="lab">Km oficial · escala b</div><div class="mid" id="kmof">—</div></div>
-      <div><div class="lab">Falta a meta</div><div class="mid" id="falta">—</div></div>
-      <div><div class="lab">Cota GPS</div><div class="mid" id="cota">—</div></div>
+  <details class="panel">
+    <summary>Cota y calibración geoidal 🔒</summary>
+    <div class="kv" style="margin-top:10px">
+      <span>Cota GPS</span><span class="mid" id="cota">—</span>
     </div>
     <div class="aviso">
       La cota sale del GPS: error típico de 10 a 20 m, bastante peor que el horizontal.
@@ -173,92 +269,13 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
     </div>
     <div class="aviso" id="calInfo">Sin calibrar. Valor de partida: 49,5 m.</div>
     <div class="aviso" id="calCerrada">🔒 La calibración la lleva el responsable de la medición.</div>
-  </div>
-
-  <div class="panel">
-    <div class="lab">Posición entre los puntos marcados</div>
-    <div class="banda">
-      <div class="ta" id="etA">—</div>
-      <div class="tb" id="etB">—</div>
-      <div class="fuera" style="left:0;width:25%"></div>
-      <div class="fuera" style="right:0;width:25%"></div>
-      <div class="pista"></div>
-      <div class="tope" style="left:25%"></div>
-      <div class="tope" style="left:75%"></div>
-      <div class="marca" id="marca" style="left:50%"></div>
-    </div>
-    <div class="estadoBanda" id="estadoBanda" style="color:var(--muted)">Sin posición todavía</div>
-    <div class="grid2">
-      <div><div class="lab">Respecto al azul</div><div class="mid" id="dA" style="color:var(--a)">—</div></div>
-      <div><div class="lab">Respecto al verde</div><div class="mid" id="dB" style="color:var(--b)">—</div></div>
-    </div>
-  </div>
-
-  <div class="panel">
-    <div class="lab">Lectura del homologador</div>
-    <div class="row" style="margin-top:8px">
-      <input id="kmHom" type="number" inputmode="decimal" step="0.001" placeholder="Km medido, p. ej. 40">
-      <button id="btnCalc">Calcular</button>
-    </div>
-    <div style="margin-top:14px">
-      <div class="lab">Longitud final previsible</div>
-      <div class="big" id="proy">—</div>
-      <div class="veredicto" id="veredicto" style="margin-top:4px;color:var(--muted)">
-        Introduce el kilómetro que te cante el homologador.
-      </div>
-    </div>
-    <div class="row" style="margin-top:14px">
-      <label class="boton" for="camara">Hacer foto del punto
-        <input id="camara" type="file" accept="image/*" capture="environment">
-      </label>
-      <button id="btnReg" disabled>Registrar esta parada</button>
-    </div>
-    <div class="tira" id="tira" hidden></div>
-    <div class="aviso" id="avisoFotos" hidden></div>
-  </div>
-
-  <div class="panel">
-    <div class="lab">Paradas registradas</div>
-    <div class="tabla-wrap">
-      <table id="tabla">
-        <thead><tr><th>Hora</th><th>Quién</th><th>Km hom.</th><th>Metro</th><th>vs A</th><th>vs B</th><th>Cota</th><th>Previsión</th></tr></thead>
-        <tbody id="tbody"><tr><td colspan="8" style="text-align:center;color:var(--muted);font-family:var(--sans)">Sin paradas todavía</td></tr></tbody>
-      </table>
-    </div>
-    <div class="row" style="margin-top:12px">
-      <button id="btnCsv" disabled>Descargar CSV</button>
-      <button id="btnZip" disabled>Descargar todo (fotos + CSV)</button>
-    </div>
-    <button id="btnBorrar" style="margin-top:10px">Borrar registro y fotos</button>
-  </div>
-
-  <div class="panel">
-    <div class="lab">Hoja de Google</div>
-    <div class="kv" style="margin-top:8px">
-      <span>Pendientes de enviar</span><span id="pend">0</span>
+    <div class="kv" style="margin-top:6px">
+      <span>Separación del eje</span><span id="desvio">—</span>
     </div>
     <div class="kv">
-      <span>Último envío</span><span id="ultEnv" style="font-family:var(--sans)">—</span>
+      <span>Estado</span><span id="estado" style="font-family:var(--sans)">En espera</span>
     </div>
-    <div class="row" style="margin-top:10px">
-      <button id="btnSync" class="primary">Sincronizar ahora</button>
-      <button id="btnUrl">Cambiar enlace</button>
-    </div>
-    <div id="cajaUrl" hidden style="margin-top:10px">
-      <label class="lab">URL del Apps Script (termina en /exec)
-        <input id="urlApi" type="url" placeholder="https://script.google.com/macros/s/…/exec" style="margin-top:4px;font-size:12px">
-      </label>
-      <div class="row" style="margin-top:8px">
-        <button id="btnUrlOk" class="primary">Guardar</button>
-        <button id="btnUrlNo">Cancelar</button>
-      </div>
-    </div>
-    <div class="aviso" id="syncInfo">Cada parada se guarda en el móvil y se envía sola cuando hay cobertura.</div>
-    <div class="aviso">
-      Las fotos se guardan dentro del navegador del móvil, no en el repositorio: la app sigue pesando
-      35 KB. Al acabar, descarga el paquete y súbelo a Drive de una vez.
-    </div>
-  </div>
+  </details>
 
   <footer>
     Objetivo de la medición homologada: <strong class="num">42.195 m</strong> reales sobre la línea óptima.
@@ -377,6 +394,12 @@ function quien(){
   return v || 'ANON';
 }
 
+function pintarQuien(){
+  const q = ($('quien').value || '').toUpperCase() || '—';
+  $('quienCab').textContent = q + (responsable ? ' · responsable' : '');
+  $('quienPill').textContent = q;
+}
+
 function pintarRol(){
   $('rol').textContent = responsable ? 'Responsable de la medición' : 'Acompañante';
   $('rol').style.color = responsable ? 'var(--teal)' : 'var(--fg)';
@@ -385,6 +408,7 @@ function pintarRol(){
   $('btnResp').hidden = responsable;
   $('geoide').readOnly = !responsable;
   $('cotaConocida').readOnly = !responsable;
+  pintarQuien();
 }
 
 try {
@@ -397,6 +421,7 @@ $('quien').addEventListener('input', () => {
   $('quien').value = $('quien').value.toUpperCase().replace(/[^A-Za-z0-9]/g,'').slice(0,4);
   try { localStorage.setItem('quienV06', $('quien').value); } catch(e){}
   $('quienInfo').textContent = 'Las fotos saldrán firmadas como ' + quien() + '.';
+  pintarQuien();
 });
 
 $('btnResp').addEventListener('click', () => { $('cajaPin').hidden = false; $('pin').focus(); });
@@ -708,6 +733,7 @@ function etiquetaPunto(){
 
 function pintarTabla(){
   const tb = $('tbody');
+  $('cuentaPar').textContent = paradas.length;
   if (!paradas.length){
     tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);font-family:var(--sans)">Sin paradas todavía</td></tr>';
     $('btnCsv').disabled = true;
