@@ -765,6 +765,14 @@ $('camara').addEventListener('change', async e => {
       hora: ahora.toISOString(), blob
     });
     pintarTira();
+    encolarFoto({
+      hora: ahora.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+      usuario: yo, etiqueta: etq,
+      nombre: etq.replace(/[^0-9A-Za-z]+/g,'-') + '_' + yo + '_' + sello + '.jpg',
+      s: sActual, peso: blob.size,
+      lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null
+    });
+    sincronizar(true);
   } catch(err){
     $('avisoFotos').hidden = false;
     $('avisoFotos').textContent = 'No se pudo procesar la foto: ' + err.message;
@@ -795,19 +803,26 @@ $('btnReg').addEventListener('click', () => {
 /* ---------- envío a la hoja de Google ----------
    Nada se envía directo y se olvida: cada parada entra en una cola guardada en el
    móvil, se intenta mandar, y si no hay cobertura se queda esperando. */
-const API_POR_DEFECTO = '';
+const API_POR_DEFECTO = 'https://script.google.com/macros/s/AKfycbz7bswlQMIao9PHE4zmE-aVzmgVHLjIRu6DI3PZkNTRTGPZSsVRuLUmg_w5mgF-9T1u5Q/exec';
 let apiUrl = '';
 try { apiUrl = localStorage.getItem('apiV06') || API_POR_DEFECTO; } catch(e){ apiUrl = API_POR_DEFECTO; }
 $('urlApi').value = apiUrl;
 
-let cola = [];
+let cola = [], colaF = [];
 try { cola = JSON.parse(localStorage.getItem('colaV06') || '[]'); } catch(e){ cola = []; }
-function guardarCola(){ try { localStorage.setItem('colaV06', JSON.stringify(cola)); } catch(e){} }
+try { colaF = JSON.parse(localStorage.getItem('colaFotosV06') || '[]'); } catch(e){ colaF = []; }
+function guardarCola(){
+  try {
+    localStorage.setItem('colaV06', JSON.stringify(cola));
+    localStorage.setItem('colaFotosV06', JSON.stringify(colaF));
+  } catch(e){}
+}
 
 function pintarSync(){
-  $('pend').textContent = cola.length;
-  $('pend').style.color = cola.length ? 'var(--warn)' : 'var(--good)';
-  $('btnSync').disabled = !cola.length || !apiUrl;
+  const n = cola.length + colaF.length;
+  $('pend').textContent = n;
+  $('pend').style.color = n ? 'var(--warn)' : 'var(--good)';
+  $('btnSync').disabled = !n || !apiUrl;
   if (!apiUrl) $('syncInfo').textContent = 'Falta el enlace del Apps Script. Pulsa «Cambiar enlace» y pégalo.';
 }
 
@@ -822,30 +837,35 @@ $('btnUrlOk').addEventListener('click', () => {
 });
 
 function encolar(p){ cola.push(p); guardarCola(); pintarSync(); }
+function encolarFoto(f){ colaF.push(f); guardarCola(); pintarSync(); }
 
 let enviando = false;
 async function sincronizar(silencio){
-  if (enviando || !cola.length || !apiUrl) return;
-  if (!navigator.onLine){ if (!silencio) $('syncInfo').textContent = 'Sin cobertura. Quedan ' + cola.length + ' por enviar.'; return; }
+  const total0 = cola.length + colaF.length;
+  if (enviando || !total0 || !apiUrl) return;
+  if (!navigator.onLine){ if (!silencio) $('syncInfo').textContent = 'Sin cobertura. Quedan ' + total0 + ' por enviar.'; return; }
   enviando = true;
   $('btnSync').disabled = true;
-  const lote = cola.slice();
+  const lote = cola.slice(), loteF = colaF.slice();
   try {
     const r = await fetch(apiUrl, {
       method: 'POST',
       headers: {'Content-Type': 'text/plain;charset=utf-8'},   // petición simple: sin preflight
-      body: JSON.stringify({version: 'V06', paradas: lote})
+      body: JSON.stringify({version: 'V06', paradas: lote, fotos: loteF})
     });
     const j = await r.json();
     if (!j || j.ok !== true) throw new Error(j && j.error ? j.error : 'respuesta inesperada');
     cola = cola.slice(lote.length);
+    colaF = colaF.slice(loteF.length);
     guardarCola();
     const h = new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
     try { localStorage.setItem('ultEnvV06', h); } catch(e){}
-    $('ultEnv').textContent = h + ' · ' + lote.length + (lote.length === 1 ? ' fila' : ' filas');
-    $('syncInfo').textContent = 'Enviado a la hoja. ' + (cola.length ? cola.length + ' pendientes todavía.' : 'Todo al día.');
+    const n = lote.length + loteF.length;
+    $('ultEnv').textContent = h + ' · ' + n + (n === 1 ? ' fila' : ' filas');
+    const q = cola.length + colaF.length;
+    $('syncInfo').textContent = 'Enviado a la hoja. ' + (q ? q + ' pendientes todavía.' : 'Todo al día.');
   } catch(err){
-    $('syncInfo').textContent = 'No se pudo enviar (' + err.message + '). Quedan ' + cola.length +
+    $('syncInfo').textContent = 'No se pudo enviar (' + err.message + '). Quedan ' + (cola.length + colaF.length) +
       ' esperando; se reintenta solo al recuperar cobertura.';
   } finally {
     enviando = false;
