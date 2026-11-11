@@ -126,6 +126,10 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
 .filakm #kmHom::placeholder{color:#4a555e;font-weight:700}
 .filakm #btnKmMas{flex:0 0 58px;width:auto;padding:10px 0;font-size:17px}
 .filakm #btnCalc{flex:0 0 124px;width:auto}
+.filalab{display:flex;align-items:center;gap:6px}
+.filalab .lab{flex:1 1 auto;min-width:0}
+.chico{flex:0 0 auto;width:auto;padding:4px 10px;font-size:11.5px;border-color:var(--line);color:var(--muted)}
+.chico.activo{border-color:var(--teal);color:var(--teal);background:rgba(0,175,154,.12)}
 .acciones .grande{font-size:16px;line-height:1.25;padding:12px 10px;min-height:86px}
 label.boton.grande{display:flex;align-items:center;justify-content:center}
 
@@ -167,7 +171,7 @@ details.panel>*:last-child{margin-bottom:14px}
       <div><span class="lab">± GPS</span><span class="mid" id="prec">—</span></div>
     </div>
 
-    <div class="banda">
+    <div class="banda" id="banda">
       <div class="ta" id="etA">—</div>
       <div class="tb" id="etB">—</div>
       <div class="fuera" style="left:0;width:25%"></div>
@@ -179,12 +183,16 @@ details.panel>*:last-child{margin-bottom:14px}
     </div>
     <div class="estadoBanda" id="estadoBanda" style="color:var(--muted)">Sin posición todavía</div>
     <div class="grid2" style="margin-top:6px">
-      <div><span class="lab">Al azul</span> <span class="mid" id="dA" style="color:var(--a);font-size:19px">—</span></div>
-      <div><span class="lab">Al verde</span> <span class="mid" id="dB" style="color:var(--b);font-size:19px">—</span></div>
+      <div id="celdaA"><span class="lab" id="labA">Al azul</span> <span class="mid" id="dA" style="color:var(--a);font-size:19px">—</span></div>
+      <div id="celdaB"><span class="lab" id="labB">Al verde</span> <span class="mid" id="dB" style="color:var(--b);font-size:19px">—</span></div>
     </div>
 
     <div class="cajakm">
-      <div class="lab">Km cantado por el homologador</div>
+      <div class="filalab">
+        <span class="lab">Km cantado por el homologador</span>
+        <button id="btnSalida" class="chico">Salida</button>
+        <button id="btnMeta" class="chico">Meta</button>
+      </div>
       <div class="filakm">
         <input id="kmHom" type="number" inputmode="decimal" step="0.001" placeholder="40">
         <button id="btnKmMas" title="Siguiente kilómetro">+1</button>
@@ -559,11 +567,41 @@ function pintar(s, desvio, prec){
   $('desvio').textContent = fmt(desvio,0) + ' m';
   if (prec != null) $('prec').textContent = '± ' + fmt(prec,0) + ' m';
 
+  if (typeof pintarMedida === 'function') pintarMedida();
+  $('btnReg').disabled = false;
+
+  const esp = modo();
+  if (esp !== 'pk'){
+    // Punto único: separación respecto al que tenemos dibujado, sin banda.
+    const sRef = esp === 'salida' ? 0 : L;
+    const d = s - sRef;
+    $('banda').hidden = true;
+    $('celdaB').hidden = true;
+    $('labA').textContent = esp === 'salida' ? 'A la salida dibujada' : 'A la meta dibujada';
+    $('dA').textContent = sig(d);
+    $('dA').style.color = 'var(--crema)';
+    const eb = $('estadoBanda');
+    if (Math.abs(d) < 10){
+      eb.textContent = esp === 'salida' ? 'Encima de la salida dibujada.' : 'Encima de la meta dibujada.';
+      eb.style.color = 'var(--good)';
+    } else {
+      eb.textContent = fmt(Math.abs(d),0) + ' m ' + (d > 0 ? 'pasada' : 'antes de') + ' la '
+        + (esp === 'salida' ? 'salida' : 'meta') + ' dibujada.';
+      eb.style.color = 'var(--warn)';
+    }
+    calcular();
+    pistaRef();
+    return;
+  }
+  $('banda').hidden = false;
+  $('celdaB').hidden = false;
+  $('labA').textContent = 'Al azul';
+  $('dA').style.color = 'var(--a)';
+
   let k = Math.round(s / PASO_B); k = Math.max(1, Math.min(42, k));
   const sA = k * 1000, sB = k * PASO_B;
   $('etA').textContent = k + 'a';
   $('etB').textContent = k + 'b';
-  if (typeof pintarMedida === 'function') pintarMedida();
   $('dA').textContent = sig(s - sA);
   $('dB').textContent = sig(s - sB);
 
@@ -589,7 +627,7 @@ function pintar(s, desvio, prec){
     eb.textContent = 'Dentro de la banda, entre ' + k + 'a y ' + k + 'b.';
     eb.style.color = 'var(--good)';
   }
-  $('btnReg').disabled = false;
+  calcular();
   pistaRef();
 }
 
@@ -776,12 +814,38 @@ function pintarMedida(){
 }
 
 let ultimaProy = null;
+let avisoHasta = 0;        // mantiene a la vista un aviso puntual unos segundos
+
+function verdicto(txt, color){
+  if (Date.now() < avisoHasta) return;
+  $('veredicto').textContent = txt;
+  $('veredicto').style.color = color;
+}
+
 function calcular(){
   const k = parseFloat($('kmHom').value);
+
+  if (modo() === 'salida'){
+    // El cero del homologador: no hay nada que extrapolar, sólo cuánto habría
+    // que mover la salida para que su cero coincida con la nuestra.
+    ultimaProy = null;
+    $('proy').textContent = '—';
+    if (sActual == null){
+      verdicto('Esperando posición.', 'var(--muted)');
+      return;
+    }
+    const d = sActual;
+    verdicto(Math.abs(d) < 10
+      ? 'El cero del homologador coincide con la salida dibujada.'
+      : 'El cero del homologador queda ' + fmt(Math.abs(d),0) + ' m '
+        + (d > 0 ? 'por delante' : 'por detrás') + ' de la salida dibujada. '
+        + 'Si se confirma, la salida hay que moverla esos metros.', Math.abs(d) < 10 ? 'var(--good)' : 'var(--warn)');
+    return;
+  }
+
   if (!isFinite(k) || k <= 0 || sActual == null){
     $('proy').textContent = '—';
-    $('veredicto').textContent = 'Escribe el km y pulsa Calcular.';
-    $('veredicto').style.color = 'var(--muted)';
+    verdicto('Escribe el km y pulsa Calcular.', 'var(--muted)');
     ultimaProy = null;
     return;
   }
@@ -789,16 +853,16 @@ function calcular(){
   const dif = proy - OBJ;
   ultimaProy = proy;
   $('proy').textContent = fmt(proy,0) + ' m';
-  const fiable = sActual > 20000 ? '' : (sActual > 10000 ? ' Todavía poco fiable a esta altura.' : ' Dato orientativo: aún es pronto para fiarse.');
-  if (Math.abs(dif) < 25){
-    $('veredicto').textContent = 'Cuadra. Diferencia de ' + sig(dif) + ' sobre los 42.195 m.' + fiable;
-    $('veredicto').style.color = 'var(--good)';
+  const fiable = modo() === 'meta' ? ' Lectura final: ésta es la que manda.'
+    : (sActual > 20000 ? '' : (sActual > 10000 ? ' Todavía poco fiable a esta altura.' : ' Dato orientativo: aún es pronto para fiarse.'));
+  // En la meta la extrapolación ya no extrapola nada: 25 m de tolerancia sobran.
+  const tol = modo() === 'meta' ? 5 : 25;
+  if (Math.abs(dif) < tol){
+    verdicto('Cuadra. Diferencia de ' + sig(dif) + ' sobre los 42.195 m.' + fiable, 'var(--good)');
   } else if (dif < 0){
-    $('veredicto').textContent = 'Faltan ' + fmt(-dif,0) + ' m. Habría que alejar la meta o retrasar la salida.' + fiable;
-    $('veredicto').style.color = 'var(--bad)';
+    verdicto('Faltan ' + fmt(-dif,0) + ' m. Habría que alejar la meta o retrasar la salida.' + fiable, 'var(--bad)');
   } else {
-    $('veredicto').textContent = 'Sobran ' + fmt(dif,0) + ' m. Habría que adelantar la meta o la salida.' + fiable;
-    $('veredicto').style.color = 'var(--warn)';
+    verdicto('Sobran ' + fmt(dif,0) + ' m. Habría que adelantar la meta o la salida.' + fiable, 'var(--warn)');
   }
 }
 /* El homologador canta los kilómetros en orden: +1 ahorra teclear en cada parada. */
@@ -909,13 +973,41 @@ let paradas = [];
 try { paradas = JSON.parse(localStorage.getItem('paradasV06') || '[]'); } catch(e){ paradas = []; }
 function guardar(){ try { localStorage.setItem('paradasV06', JSON.stringify(paradas)); } catch(e){} }
 
+/* Salida y meta no son kilómetros intermedios: no tienen pareja azul/verde,
+   sino un único punto dibujado del que medimos la separación. */
+const KM_META = 42.195;
+function modo(){
+  const km = parseFloat($('kmHom').value);
+  if (km === 0) return 'salida';
+  if (isFinite(km) && Math.abs(km - KM_META) < 0.0005) return 'meta';
+  return 'pk';
+}
+
 function etiquetaPunto(){
+  const m = modo();
+  if (m === 'salida') return 'SALIDA';
+  if (m === 'meta') return 'META';
   const km = parseFloat($('kmHom').value);
   if (isFinite(km) && km > 0) return 'PK ' + (Number.isInteger(km) ? km : fmt(km, 3));
   if (sActual == null) return 'Sin situar';
   let k = Math.round(sActual / PASO_B); k = Math.max(1, Math.min(42, k));
   return 'PK ' + k + ' (aprox.)';
 }
+
+function fijarKm(v, boton){
+  $('kmHom').value = v;
+  $('btnSalida').classList.toggle('activo', boton === 'salida');
+  $('btnMeta').classList.toggle('activo', boton === 'meta');
+  if (sActual != null) pintar(sActual, 0, null);
+  calcular();
+}
+$('btnSalida').addEventListener('click', () => fijarKm(0, 'salida'));
+$('btnMeta').addEventListener('click', () => fijarKm(KM_META, 'meta'));
+$('kmHom').addEventListener('input', () => {
+  const m = modo();
+  $('btnSalida').classList.toggle('activo', m === 'salida');
+  $('btnMeta').classList.toggle('activo', m === 'meta');
+});
 
 function pintarTabla(){
   const tb = $('tbody');
@@ -1000,20 +1092,26 @@ $('camara').addEventListener('change', async e => {
 $('btnReg').addEventListener('click', () => {
   if (sActual == null) return;
   if (!medidaFresca()){
-    $('veredicto').textContent = 'Parada apuntada SIN los 30 s de medición: vale como referencia, '
-      + 'pero no para decidir. Pulsa «Medir punto» y vuelve a registrar.';
-    $('veredicto').style.color = 'var(--warn)';
+    avisoHasta = 0;
+    verdicto('Parada apuntada SIN los 30 s de medición: vale como referencia, '
+      + 'pero no para decidir. Pulsa «Medir punto» y vuelve a registrar.', 'var(--warn)');
+    avisoHasta = Date.now() + 12000;
   }
+  const esp = modo();
   let k = Math.round(sActual / PASO_B); k = Math.max(1, Math.min(42, k));
   const km = parseFloat($('kmHom').value);
   const N = parseFloat($('geoide').value);
+  // En salida y meta el punto de referencia es único, así que las dos distancias
+  // son la misma: la separación respecto al punto dibujado.
+  const sA = esp === 'salida' ? 0 : esp === 'meta' ? L : k * 1000;
+  const sB = esp === 'salida' ? 0 : esp === 'meta' ? L : k * PASO_B;
   paradas.push({
     hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
     km: isFinite(km) ? km : null,
     usuario: quien(),
     medido: medidaFresca(),
-    s: sActual, pk: k,
-    dA: sActual - k*1000, dB: sActual - k*PASO_B,
+    s: sActual, pk: esp === 'salida' ? 'SALIDA' : esp === 'meta' ? 'META' : k,
+    dA: sActual - sA, dB: sActual - sB,
     cota: altActual == null ? null : altActual - (isFinite(N) ? N : 0) - hAntena(),
     cotaDisp: dispCota,
     lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null,
