@@ -3,58 +3,62 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f4f6f8">
 <title>Control de Homologación</title>
-
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700&family=Roboto+Condensed:wght@700&display=swap">
 <style>
-/* Instrumento de campo: una columna, lectura grande, sin dependencias externas */
+/* Instrumento de campo, con la identidad visual de la Maratón Elche-Alicante 2026:
+   fondo negro, verde azulado de acción, azul claro de acento, crema para lo que se lee de lejos.
+   Esquinas rectas y titulares condensados, como en la web de la carrera. */
 :root{
-  --bg:#f4f6f8; --panel:#ffffff; --fg:#10161d; --muted:#5d6b7a; --line:#d7dde4;
-  --a:#1565c0; --b:#2e8b3d; --warn:#c75c00; --bad:#c62828; --good:#2e7d32;
-  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --bg:#000000; --panel:#101316; --panel2:#171b20; --fg:#ffffff; --crema:#F6EBD6;
+  --muted:#94a0ab; --line:#2a3138;
+  --teal:#00AF9A; --azulm:#1863DC; --cian:#6EC1E4;
+  --a:#6EC1E4; --b:#00AF9A; --warn:#ffb13d; --bad:#ff6b6b; --good:#4fd1a5;
+  --sans:Raleway,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --cond:"Roboto Condensed",ui-sans-serif,system-ui,"Arial Narrow",sans-serif;
   --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
-  color-scheme:light;
+  color-scheme:dark;
 }
-@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
-  --bg:#0e1319; --panel:#171d25; --fg:#eef2f6; --muted:#93a1b0; --line:#2b343f;
-  --a:#5fa8f5; --b:#5ec96f; --warn:#ffa24d; --bad:#ff6b6b; --good:#6fd080; color-scheme:dark; } }
-:root[data-theme="dark"]{
-  --bg:#0e1319; --panel:#171d25; --fg:#eef2f6; --muted:#93a1b0; --line:#2b343f;
-  --a:#5fa8f5; --b:#5ec96f; --warn:#ffa24d; --bad:#ff6b6b; --good:#6fd080; color-scheme:dark; }
-
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--sans);margin:0;
   padding-left:max(14px,env(safe-area-inset-left,0px));
   padding-right:max(14px,env(safe-area-inset-right,0px));
   padding-block:12px 28px;font-size:15px;line-height:1.45}
 .wrap{display:flex;flex-direction:column;gap:12px;max-width:560px;margin:0 auto}
-h1{font-size:15px;margin:0;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650}
-.sub{font-size:12px;color:var(--muted);margin:0}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
-.lab{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:650}
-.big{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:40px;line-height:1.05;font-weight:650;letter-spacing:-.02em}
-.mid{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:24px;font-weight:650}
+.cabecera{border-top:4px solid var(--teal);padding-top:12px}
+h1{font-family:var(--cond);font-size:21px;margin:0;letter-spacing:.02em;text-transform:uppercase;
+  color:var(--crema);font-weight:700;line-height:1.1}
+.sub{font-size:12px;color:var(--muted);margin:2px 0 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:14px}
+.lab{font-family:var(--cond);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--cian);font-weight:700}
+.big{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:40px;line-height:1.05;
+  font-weight:700;letter-spacing:-.02em;color:var(--crema)}
+.mid{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:23px;font-weight:700;color:var(--fg)}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .row>*{flex:1 1 150px;min-width:0}
-button{font:inherit;font-weight:600;padding:13px 14px;border-radius:10px;border:1px solid var(--line);
-  background:var(--panel);color:var(--fg);cursor:pointer;width:100%}
-button.primary{background:var(--fg);color:var(--panel);border-color:var(--fg)}
-button:disabled{opacity:.45}
-button:focus-visible,input:focus-visible{outline:2px solid var(--a);outline-offset:2px}
-input{font:inherit;font-family:var(--mono);padding:12px;border-radius:10px;border:1px solid var(--line);
-  background:var(--bg);color:var(--fg);width:100%}
+button{font:inherit;font-family:var(--cond);text-transform:uppercase;letter-spacing:.05em;
+  font-weight:700;font-size:14px;padding:14px;border-radius:0;border:1px solid var(--teal);
+  background:transparent;color:var(--fg);cursor:pointer;width:100%}
+button.primary{background:var(--teal);color:#fff;border-color:var(--teal)}
+button:disabled{opacity:.35}
+button:focus-visible,input:focus-visible{outline:2px solid var(--cian);outline-offset:2px}
+input{font:inherit;font-family:var(--mono);padding:12px;border-radius:0;border:1px solid var(--line);
+  background:var(--panel2);color:var(--fg);width:100%}
+input::placeholder{color:#6b7883}
 /* banda a <-> b */
 .banda{position:relative;height:62px;margin-top:10px;overflow:hidden}
-.fuera{position:absolute;top:28px;height:6px;border-radius:3px;background:var(--line)}
-.pista{position:absolute;left:25%;right:25%;top:26px;height:10px;border-radius:5px;
+.fuera{position:absolute;top:28px;height:6px;border-radius:0;background:var(--line)}
+.pista{position:absolute;left:25%;right:25%;top:26px;height:10px;border-radius:0;
   background:linear-gradient(90deg,var(--a),var(--b))}
 .tope{position:absolute;top:18px;width:2px;height:26px;background:var(--muted);opacity:.55}
-.marca{position:absolute;top:11px;width:3px;height:38px;background:var(--fg);border-radius:2px;
+.marca{position:absolute;top:11px;width:3px;height:38px;background:var(--crema);border-radius:0;
   transition:left .25s ease}
-.marca.tope-izq,.marca.tope-der{width:9px;background:var(--bad);border-radius:2px}
+.marca.tope-izq,.marca.tope-der{width:9px;background:var(--bad);border-radius:0}
 .banda .ta,.banda .tb{position:absolute;top:0;font-size:11px;font-weight:700;transform:translateX(-50%)}
 .banda .ta{left:25%;color:var(--a)}
 .banda .tb{left:75%;color:var(--b)}
@@ -64,9 +68,9 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}
 th,td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--line);
   font-variant-numeric:tabular-nums;font-family:var(--mono)}
 th:first-child,td:first-child{text-align:left;font-family:var(--sans)}
-th{color:var(--muted);font-weight:650;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
+th{color:var(--cian);font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:.07em;text-transform:uppercase}
 .tabla-wrap{overflow-x:auto}
-.pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:700;
+.pill{display:inline-block;padding:3px 9px;border-radius:0;font-size:11.5px;font-weight:700;
   letter-spacing:.03em}
 .ok{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
 .at{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
@@ -74,12 +78,13 @@ th{color:var(--muted);font-weight:650;font-size:10.5px;letter-spacing:.06em;text
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 @media (max-width:400px){.grid3{grid-template-columns:1fr 1fr}}
-label.boton{display:block;font-weight:600;padding:13px 14px;border-radius:10px;border:1px solid var(--line);
-  background:var(--panel);color:var(--fg);cursor:pointer;text-align:center}
+label.boton{display:block;font-family:var(--cond);text-transform:uppercase;letter-spacing:.05em;
+  font-weight:700;font-size:14px;padding:14px;border-radius:0;border:1px solid var(--teal);
+  background:transparent;color:var(--fg);cursor:pointer;text-align:center}
 label.boton input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .tira{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:4px}
 .tira figure{margin:0;flex:0 0 auto;width:96px}
-.tira img{width:96px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+.tira img{width:96px;height:72px;object-fit:cover;border-radius:0;border:1px solid var(--line);display:block}
 .tira figcaption{font-size:10.5px;color:var(--muted);text-align:center;margin-top:3px;font-weight:650}
 .aviso{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.45}
 .kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
@@ -91,12 +96,37 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
 </head>
 <body>
 
-
 <div class="wrap">
 
-  <div>
+  <div class="cabecera">
     <h1>Control de homologación</h1>
-    <p class="sub">Maratón Elche–Alicante · trazado V06 · <span class="num">42.507,89 m</span> dibujados</p>
+    <p class="sub">2ª Maratón Internacional Elche–Alicante · trazado V06 · <span class="num">42.507,89 m</span> dibujados</p>
+  </div>
+
+  <div class="panel">
+    <div class="lab">Quién está midiendo</div>
+    <div class="grid2" style="margin-top:8px">
+      <label class="lab">Acrónimo (2–4 letras)
+        <input id="quien" maxlength="4" autocapitalize="characters" placeholder="RB" style="margin-top:4px;text-transform:uppercase">
+      </label>
+      <div>
+        <div class="lab">Perfil</div>
+        <div class="mid" id="rol" style="font-size:17px;margin-top:6px">Acompañante</div>
+      </div>
+    </div>
+    <div class="aviso" id="quienInfo">Tu acrónimo va en el nombre y en el pie de cada foto.</div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnResp">Soy el responsable</button>
+    </div>
+    <div id="cajaPin" hidden style="margin-top:10px">
+      <label class="lab">PIN de responsable
+        <input id="pin" type="password" inputmode="numeric" autocomplete="off" style="margin-top:4px">
+      </label>
+      <div class="row" style="margin-top:8px">
+        <button id="btnPin" class="primary">Desbloquear</button>
+        <button id="btnPinNo">Cancelar</button>
+      </div>
+    </div>
   </div>
 
   <div class="panel">
@@ -135,11 +165,14 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
         <input id="cotaConocida" type="number" step="0.1" placeholder="opcional" style="margin-top:4px">
       </label>
     </div>
-    <div class="row" style="margin-top:10px">
-      <button id="btnCalRef">Calibrar en punto de referencia</button>
-      <button id="btnCalMan">Calibrar con la cota escrita</button>
+    <div id="zonaCal" hidden>
+      <div class="row" style="margin-top:10px">
+        <button id="btnCalRef">Calibrar en punto de referencia</button>
+        <button id="btnCalMan">Calibrar con la cota escrita</button>
+      </div>
     </div>
     <div class="aviso" id="calInfo">Sin calibrar. Valor de partida: 49,5 m.</div>
+    <div class="aviso" id="calCerrada">🔒 La calibración la lleva el responsable de la medición.</div>
   </div>
 
   <div class="panel">
@@ -188,8 +221,8 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
     <div class="lab">Paradas registradas</div>
     <div class="tabla-wrap">
       <table id="tabla">
-        <thead><tr><th>Hora</th><th>Km hom.</th><th>Metro</th><th>vs A</th><th>vs B</th><th>Cota</th><th>Previsión</th></tr></thead>
-        <tbody id="tbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);font-family:var(--sans)">Sin paradas todavía</td></tr></tbody>
+        <thead><tr><th>Hora</th><th>Quién</th><th>Km hom.</th><th>Metro</th><th>vs A</th><th>vs B</th><th>Cota</th><th>Previsión</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="8" style="text-align:center;color:var(--muted);font-family:var(--sans)">Sin paradas todavía</td></tr></tbody>
       </table>
     </div>
     <div class="row" style="margin-top:12px">
@@ -309,7 +342,65 @@ function fijarGeoide(N, texto){
   $('calInfo').textContent = texto;
 }
 
+/* ---------- Quién mide y quién puede calibrar ----------
+   El candado es para que nadie toque la calibración por descuido, no es seguridad:
+   el código de la app es público, así que el PIN sólo evita accidentes. */
+const PIN_HASH = 'd430628b2173ce5bc597e72f2e78ea5b01c7fa93be413dd2b48fdd74b4f38e30';
+let responsable = false;
+
+function quien(){
+  const v = ($('quien').value || '').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+  return v || 'ANON';
+}
+
+function pintarRol(){
+  $('rol').textContent = responsable ? 'Responsable de la medición' : 'Acompañante';
+  $('rol').style.color = responsable ? 'var(--teal)' : 'var(--fg)';
+  $('zonaCal').hidden = !responsable;
+  $('calCerrada').hidden = responsable;
+  $('btnResp').hidden = responsable;
+  $('geoide').readOnly = !responsable;
+  $('cotaConocida').readOnly = !responsable;
+}
+
+try {
+  const q = localStorage.getItem('quienV06'); if (q) $('quien').value = q;
+  responsable = localStorage.getItem('rolV06') === 'resp';
+} catch(e){}
+pintarRol();
+
+$('quien').addEventListener('input', () => {
+  $('quien').value = $('quien').value.toUpperCase().replace(/[^A-Za-z0-9]/g,'').slice(0,4);
+  try { localStorage.setItem('quienV06', $('quien').value); } catch(e){}
+  $('quienInfo').textContent = 'Las fotos saldrán firmadas como ' + quien() + '.';
+});
+
+$('btnResp').addEventListener('click', () => { $('cajaPin').hidden = false; $('pin').focus(); });
+$('btnPinNo').addEventListener('click', () => { $('cajaPin').hidden = true; $('pin').value = ''; });
+
+async function sha256(txt){
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+  return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2,'0')).join('');
+}
+
+$('btnPin').addEventListener('click', async () => {
+  let h = '';
+  try { h = await sha256($('pin').value.trim()); }
+  catch(e){ $('quienInfo').textContent = 'Este navegador no deja comprobar el PIN (hace falta https).'; return; }
+  if (h === PIN_HASH){
+    responsable = true;
+    try { localStorage.setItem('rolV06','resp'); } catch(e){}
+    $('cajaPin').hidden = true; $('pin').value = '';
+    pintarRol(); pistaRef();
+    $('quienInfo').textContent = 'Calibración desbloqueada en este teléfono.';
+  } else {
+    $('pin').value = '';
+    $('quienInfo').textContent = 'PIN incorrecto.';
+  }
+});
+
 function pistaRef(){
+  if (!responsable) return;
   if (altActual == null || sActual == null) return;
   const r = refMasCercana();
   if (!r) return;
@@ -344,6 +435,7 @@ $('btnCalMan').addEventListener('click', () => {
 
 document.addEventListener('input', e => {
   if (e.target.id === 'geoide'){
+    if (!responsable) return;
     pintarCota();
     try { localStorage.setItem('geoideV06', e.target.value); } catch(err){}
     $('calInfo').textContent = 'Corrección introducida a mano: ' + e.target.value + ' m.';
@@ -562,9 +654,11 @@ async function procesarFoto(fichero, pie){
   const g = c.getContext('2d');
   g.drawImage(img, 0, 0, w, h);
   const alto = Math.max(34, Math.round(h * 0.075));
-  g.fillStyle = 'rgba(10,16,22,0.72)';
+  g.fillStyle = 'rgba(0,0,0,0.78)';
   g.fillRect(0, h - alto, w, alto);
-  g.fillStyle = '#fff';
+  g.fillStyle = '#00AF9A';                      // franja de la marca
+  g.fillRect(0, h - alto, Math.max(4, Math.round(alto * 0.09)), alto);
+  g.fillStyle = '#F6EBD6';
   g.textBaseline = 'middle';
   g.font = '700 ' + Math.round(alto * 0.42) + 'px system-ui, sans-serif';
   g.fillText(pie.titulo, Math.round(alto * 0.35), h - alto * 0.62);
@@ -591,13 +685,13 @@ function etiquetaPunto(){
 function pintarTabla(){
   const tb = $('tbody');
   if (!paradas.length){
-    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);font-family:var(--sans)">Sin paradas todavía</td></tr>';
+    tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);font-family:var(--sans)">Sin paradas todavía</td></tr>';
     $('btnCsv').disabled = true;
   } else {
     tb.innerHTML = paradas.map(p => {
       const cls = p.proy == null ? '' : Math.abs(p.proy - OBJ) < 25 ? 'ok' : p.proy < OBJ ? 'ko' : 'at';
       const pr = p.proy == null ? '—' : '<span class="pill ' + cls + '">' + fmt(p.proy,0) + '</span>';
-      return '<tr><td>' + p.hora + '</td><td>' + (p.km ?? '—') + '</td><td>' + fmt(p.s,0) +
+      return '<tr><td>' + p.hora + '</td><td>' + (p.usuario ?? '—') + '</td><td>' + (p.km ?? '—') + '</td><td>' + fmt(p.s,0) +
              '</td><td>' + sig(p.dA) + '</td><td>' + sig(p.dB) +
              '</td><td>' + (p.cota == null ? '—' : fmt(p.cota,1)) + '</td><td>' + pr + '</td></tr>';
     }).join('');
@@ -615,7 +709,7 @@ async function pintarTira(){
   if (!fotos.length){ t.innerHTML = ''; return; }
   t.innerHTML = fotos.slice(-12).map(f =>
     '<figure><img alt="' + f.etiqueta + '" src="' + URL.createObjectURL(f.blob) + '">' +
-    '<figcaption>' + f.etiqueta + '</figcaption></figure>').join('');
+    '<figcaption>' + f.etiqueta + (f.usuario ? ' · ' + f.usuario : '') + '</figcaption></figure>').join('');
   const bytes = fotos.reduce((a, f) => a + f.blob.size, 0);
   const peso = bytes < 1048576 ? fmt(bytes / 1024, 0) + ' KB' : fmt(bytes / 1048576, 1) + ' MB';
   av.textContent = fotos.length === 1
@@ -631,14 +725,18 @@ $('camara').addEventListener('change', async e => {
   if (!f || !bd) return;
   const etq = etiquetaPunto();
   const ahora = new Date();
+  const yo = quien();
   const detalle = (sActual == null ? 'sin posición' : 'metro ' + fmt(sActual, 0) + ' del trazado')
     + ' · ' + ahora.toLocaleString('es-ES')
+    + ' · ' + yo
     + (ultimaCoord ? ' · ' + ultimaCoord.la.toFixed(6) + ', ' + ultimaCoord.lo.toFixed(6) : '');
   try {
     const blob = await procesarFoto(f, {titulo: etq + ' · Maratón Elche-Alicante V06', detalle});
     const sello = ahora.toISOString().slice(0,16).replace('T','_').replace(/[:-]/g,'');
     await guardarFoto({
-      etiqueta: etq, nombre: etq.replace(/[^0-9A-Za-z]+/g,'-') + '_' + sello + '.jpg',
+      etiqueta: etq,
+      usuario: yo,
+      nombre: etq.replace(/[^0-9A-Za-z]+/g,'-') + '_' + yo + '_' + sello + '.jpg',
       s: sActual, lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null,
       hora: ahora.toISOString(), blob
     });
@@ -657,6 +755,7 @@ $('btnReg').addEventListener('click', () => {
   paradas.push({
     hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
     km: isFinite(km) ? km : null,
+    usuario: quien(),
     s: sActual, pk: k,
     dA: sActual - k*1000, dB: sActual - k*PASO_B,
     cota: altActual == null ? null : altActual - (isFinite(N) ? N : 0),
@@ -673,8 +772,8 @@ $('btnBorrar').addEventListener('click', async () => {
 });
 
 function csv(){
-  const cab = 'hora;km_homologador;metro_trazado;pk;dist_a_A_m;dist_a_B_m;cota_gps_m;dispersion_cota_m;lat;lon;longitud_previsible_m\n';
-  const cuerpo = paradas.map(p => [p.hora, p.km ?? '', p.s.toFixed(1), p.pk,
+  const cab = 'hora;usuario;km_homologador;metro_trazado;pk;dist_a_A_m;dist_a_B_m;cota_gps_m;dispersion_cota_m;lat;lon;longitud_previsible_m\n';
+  const cuerpo = paradas.map(p => [p.hora, p.usuario ?? '', p.km ?? '', p.s.toFixed(1), p.pk,
       p.dA.toFixed(1), p.dB.toFixed(1),
       p.cota == null ? '' : p.cota.toFixed(1), p.cotaDisp == null ? '' : p.cotaDisp.toFixed(1),
       p.lat == null ? '' : p.lat.toFixed(7), p.lon == null ? '' : p.lon.toFixed(7),
@@ -702,12 +801,6 @@ $('btnZip').addEventListener('click', async () => {
   }
 });
 
-if ('serviceWorker' in navigator && location.protocol === 'https:'){
-  navigator.serviceWorker.register('sw.js').then(() => {
-    $('estado').textContent = 'Lista para usar sin cobertura';
-  }).catch(()=>{});
-}
-
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && 'wakeLock' in navigator && watchId != null){
     navigator.wakeLock.request('screen').then(w => wake = w).catch(()=>{});
@@ -715,5 +808,10 @@ document.addEventListener('visibilitychange', () => {
 });
 </script>
 
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+</script>
 </body>
 </html>
