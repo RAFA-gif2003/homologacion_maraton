@@ -130,6 +130,7 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
 .filalab .lab{flex:1 1 auto;min-width:0}
 .chico{flex:0 0 auto;width:auto;padding:4px 10px;font-size:11.5px;border-color:var(--line);color:var(--muted)}
 .chico.activo{border-color:var(--teal);color:var(--teal);background:rgba(0,175,154,.12)}
+.suave{margin-top:8px;border-color:var(--line);color:var(--muted);font-size:12px;padding:9px}
 .acciones .grande{font-size:16px;line-height:1.25;padding:12px 10px;min-height:86px}
 label.boton.grande{display:flex;align-items:center;justify-content:center}
 
@@ -161,7 +162,6 @@ details.panel>*:last-child{margin-bottom:14px}
   <div class="panel foco">
     <div class="row">
       <button id="btnGps" class="primary">Activar GPS</button>
-      <button id="btnProm" disabled>Medir punto · 30 s</button>
     </div>
 
     <div class="cinta">
@@ -207,11 +207,12 @@ details.panel>*:last-child{margin-bottom:14px}
     </div>
 
     <div class="acciones">
-      <button id="btnReg" class="primary grande" disabled>✓<br>Registrar<br>parada</button>
-      <label class="boton grande" for="camara">📷<br>Hacer<br>foto
+      <button id="btnProm" class="primary grande" disabled>📍<br>Medir punto<br>30 s</button>
+      <label class="boton grande" for="camara">📷<br>Foto<br>adicional
         <input id="camara" type="file" accept="image/*" capture="environment">
       </label>
     </div>
+    <button id="btnReg" class="suave" disabled>Registrar a mano, sin medir</button>
     <div class="aviso" id="avisoFotos" hidden></div>
   </div>
 
@@ -457,7 +458,7 @@ function fijarGeoide(N, texto){
 const PIN_HASH = 'd430628b2173ce5bc597e72f2e78ea5b01c7fa93be413dd2b48fdd74b4f38e30';
 let responsable = false;
 
-function quien(){
+function siglas(){
   const v = ($('quien').value || '').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
   return v || 'ANON';
 }
@@ -488,7 +489,7 @@ pintarRol();
 $('quien').addEventListener('input', () => {
   $('quien').value = $('quien').value.toUpperCase().replace(/[^A-Za-z0-9]/g,'').slice(0,4);
   try { localStorage.setItem('quienV06', $('quien').value); } catch(e){}
-  $('quienInfo').textContent = 'Las fotos saldrán firmadas como ' + quien() + '.';
+  $('quienInfo').textContent = 'Las fotos saldrán firmadas como ' + siglas() + '.';
   pintarQuien();
 });
 
@@ -795,6 +796,7 @@ function rematarMedida(){
   $('estado').textContent = txt;
   calcular();
   pintarMedida();
+  registrarParada(true);      // la medición es la parada: no hay que pulsar nada más
 }
 
 /* Avisa si vas a registrar una parada sin haber medido el punto, o si te has
@@ -806,11 +808,9 @@ function medidaFresca(){
 }
 
 function pintarMedida(){
-  const b = $('btnReg');
-  if (sActual == null){ b.textContent = '✓\nRegistrar\nparada'; return; }
-  b.innerHTML = medidaFresca()
-    ? '✓<br>Registrar<br>parada'
-    : '⚠️<br>Registrar<br>sin medir';
+  $('btnReg').textContent = medidaFresca()
+    ? 'Registrar otra vez este punto'
+    : 'Registrar a mano, sin medir';
 }
 
 let ultimaProy = null;
@@ -1053,7 +1053,7 @@ async function guardarDisparo(fuente, m30){
   if (!bd) return;
   const etq = etiquetaPunto();
   const ahora = new Date();
-  const yo = quien();
+  const yo = siglas();
   const detalle = (sActual == null ? 'sin posición' : 'metro ' + fmt(sActual, 0) + ' del trazado')
     + ' · ' + ahora.toLocaleString('es-ES')
     + ' · ' + yo
@@ -1089,7 +1089,7 @@ $('camara').addEventListener('change', async e => {
   if (f) guardarDisparo(f, false);
 });
 
-$('btnReg').addEventListener('click', () => {
+function registrarParada(auto){
   if (sActual == null) return;
   if (!medidaFresca()){
     avisoHasta = 0;
@@ -1108,7 +1108,7 @@ $('btnReg').addEventListener('click', () => {
   paradas.push({
     hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
     km: isFinite(km) ? km : null,
-    usuario: quien(),
+    usuario: siglas(),
     medido: medidaFresca(),
     s: sActual, pk: esp === 'salida' ? 'SALIDA' : esp === 'meta' ? 'META' : k,
     dA: sActual - sA, dB: sActual - sB,
@@ -1120,7 +1120,14 @@ $('btnReg').addEventListener('click', () => {
   guardar(); pintarTabla(); pintarTira();
   encolar(paradas[paradas.length - 1]);
   sincronizar(true);
-});
+  if (auto){
+    avisoHasta = 0;
+    verdicto('Parada ' + etiquetaPunto() + ' registrada y foto hecha. Siguiente punto: +1.', 'var(--good)');
+    avisoHasta = Date.now() + 9000;
+  }
+}
+
+$('btnReg').addEventListener('click', () => registrarParada(false));
 
 /* ---------- envío a la hoja de Google ----------
    Nada se envía directo y se olvida: cada parada entra en una cola guardada en el
