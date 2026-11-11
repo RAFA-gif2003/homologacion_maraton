@@ -194,7 +194,7 @@ details.panel>*:last-child{margin-bottom:14px}
         <button id="btnMeta" class="chico">Meta</button>
       </div>
       <div class="filakm">
-        <input id="kmHom" type="number" inputmode="decimal" step="0.001" placeholder="40">
+        <input id="kmHom" type="text" inputmode="decimal" autocomplete="off" placeholder="40">
         <button id="btnKmMenos" title="Kilómetro anterior">−1</button>
         <button id="btnKmMas" title="Siguiente kilómetro">+1</button>
         <button id="btnCalc" class="primary">Calcular</button>
@@ -643,8 +643,10 @@ function arrancarGps(){
     const {latitude:la, longitude:lo, accuracy:ac, altitude:al, altitudeAccuracy:aac} = pos.coords;
     ultimaCoord = {la, lo};
     if (al != null){ altActual = al; altPrecision = aac; pintarCota(); }
-    const km = parseFloat($('kmHom').value);
-    const ref = isFinite(km) && km > 0 ? km * PASO_B : sActual;
+    const m = modo();
+    const km = kmValor();
+    const ref = m === 'salida' ? 0 : m === 'meta' ? L
+      : (isFinite(km) && km > 0 ? km * PASO_B : sActual);
     const r = localizar(la, lo, ref);
     if (promediando){
       buffer.push(r.s);
@@ -824,7 +826,7 @@ function verdicto(txt, color){
 }
 
 function calcular(){
-  const k = parseFloat($('kmHom').value);
+  const k = kmValor();
 
   if (modo() === 'salida'){
     // El cero del homologador: no hay nada que extrapolar, sólo cuánto habría
@@ -869,9 +871,10 @@ function calcular(){
 /* El homologador canta los kilómetros en orden: +1 y −1 ahorran teclear,
    y −1 saca de un km mal metido sin tener que borrarlo a mano. */
 function saltarKm(paso){
-  const v = parseFloat($('kmHom').value);
+  const v = kmValor();
   const base = isFinite(v) ? Math.round(v) : (sActual == null ? 0 : Math.round(sActual / PASO_B));
-  fijarKm(Math.max(0, Math.min(42, base + paso)), null);
+  const n = Math.max(0, Math.min(42, base + paso));
+  fijarKm(n === 0 ? 'S' : n, n === 0 ? 'salida' : null);
 }
 $('btnKmMas').addEventListener('click', () => saltarKm(1));
 $('btnKmMenos').addEventListener('click', () => saltarKm(-1));
@@ -979,18 +982,31 @@ function guardar(){ try { localStorage.setItem('paradasV06', JSON.stringify(para
 /* Salida y meta no son kilómetros intermedios: no tienen pareja azul/verde,
    sino un único punto dibujado del que medimos la separación. */
 const KM_META = 42.195;
+
+/* El campo acepta "S" y "M" además del número: 42,195 no cabe en la casilla
+   y los decimales se perdían justo en el punto que más importa. */
 function modo(){
-  const km = parseFloat($('kmHom').value);
+  const v = ($('kmHom').value || '').trim().toUpperCase();
+  if (v === 'S') return 'salida';
+  if (v === 'M') return 'meta';
+  const km = parseFloat(v.replace(',', '.'));
   if (km === 0) return 'salida';
   if (isFinite(km) && Math.abs(km - KM_META) < 0.0005) return 'meta';
   return 'pk';
+}
+
+function kmValor(){
+  const m = modo();
+  if (m === 'salida') return 0;
+  if (m === 'meta') return KM_META;
+  return parseFloat(($('kmHom').value || '').replace(',', '.'));
 }
 
 function etiquetaPunto(){
   const m = modo();
   if (m === 'salida') return 'SALIDA';
   if (m === 'meta') return 'META';
-  const km = parseFloat($('kmHom').value);
+  const km = kmValor();
   if (isFinite(km) && km > 0) return 'PK ' + (Number.isInteger(km) ? km : fmt(km, 3));
   if (sActual == null) return 'Sin situar';
   let k = Math.round(sActual / PASO_B); k = Math.max(1, Math.min(42, k));
@@ -1004,9 +1020,10 @@ function fijarKm(v, boton){
   if (sActual != null) pintar(sActual, 0, null);
   calcular();
 }
-$('btnSalida').addEventListener('click', () => fijarKm(0, 'salida'));
-$('btnMeta').addEventListener('click', () => fijarKm(KM_META, 'meta'));
+$('btnSalida').addEventListener('click', () => fijarKm('S', 'salida'));
+$('btnMeta').addEventListener('click', () => fijarKm('M', 'meta'));
 $('kmHom').addEventListener('input', () => {
+  $('kmHom').value = $('kmHom').value.toUpperCase().replace(/[^0-9.,SM]/g, '').slice(0, 6);
   const m = modo();
   $('btnSalida').classList.toggle('activo', m === 'salida');
   $('btnMeta').classList.toggle('activo', m === 'meta');
@@ -1102,7 +1119,7 @@ function registrarParada(auto){
   }
   const esp = modo();
   let k = Math.round(sActual / PASO_B); k = Math.max(1, Math.min(42, k));
-  const km = parseFloat($('kmHom').value);
+  const km = kmValor();
   const N = parseFloat($('geoide').value);
   // En salida y meta el punto de referencia es único, así que las dos distancias
   // son la misma: la separación respecto al punto dibujado.
