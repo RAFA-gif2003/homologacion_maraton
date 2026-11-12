@@ -156,7 +156,7 @@ details.panel>*:last-child{margin-bottom:14px}
   <div class="cabecera">
     <h1>Control de homologación</h1>
     <p class="sub">Maratón Elche–Alicante · V06 · <span class="num">42.507,89 m</span> · <span id="quienCab">—</span>
-      · <span class="num" id="version">v19</span></p>
+      · <span class="num" id="version">v20</span></p>
   </div>
 
   <!-- Todo lo que se usa en cada parada cabe aquí, sin bajar la pantalla. -->
@@ -254,8 +254,8 @@ details.panel>*:last-child{margin-bottom:14px}
     </div>
     <div class="aviso" id="syncInfo">Cada parada se guarda en el móvil y se envía sola cuando hay cobertura.</div>
     <div class="aviso">
-      Las fotos se quedan dentro del navegador del móvil: a la hoja sólo va su nombre y quién la hizo.
-      Al acabar, descarga el paquete y súbelo a Drive de una vez.
+      Las fotos se suben a Drive de una en una, siempre por detrás de los datos. Las que
+      falten siguen en el móvil y se reintentan solas. Descarga el paquete igualmente al acabar.
     </div>
   </details>
 
@@ -283,6 +283,66 @@ details.panel>*:last-child{margin-bottom:14px}
         <button id="btnPinNo">Cancelar</button>
       </div>
     </div>
+  </details>
+
+  <details class="panel" id="panelComp" hidden>
+    <summary>Comparativa entre todos 🔒</summary>
+    <div class="aviso">Lo que ha registrado cada móvil en cada kilómetro, leído de la hoja.
+      Marca en rojo los puntos donde las lecturas se separan más de 20 m.</div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnComp" class="primary">Actualizar</button>
+    </div>
+    <div class="tabla-wrap" style="margin-top:10px">
+      <table id="tablaComp"><thead id="compCab"></thead><tbody id="compCuerpo"></tbody></table>
+    </div>
+  </details>
+
+  <details class="panel" id="panelDef" hidden>
+    <summary>Puntos definitivos 🔒</summary>
+    <div class="aviso">Para marcar sobre el terreno los puntos ya corregidos, después de
+      ajustar salida y meta. Introduce primero cuánto se ha corregido cada extremo.</div>
+    <div class="grid2" style="margin-top:10px">
+      <label class="lab">Ajuste de la salida (m)
+        <input id="ajSalida" type="number" step="0.01" value="0" style="margin-top:4px">
+      </label>
+      <label class="lab">Ajuste de la meta (m)
+        <input id="ajMeta" type="number" step="0.01" value="0" style="margin-top:4px">
+      </label>
+    </div>
+    <div class="aviso">En los dos: <strong>+ alarga</strong> el recorrido y <strong>−</strong> lo acorta.
+      Si la salida se retrasa 30 m para ganar recorrido, escribe <span class="num">+30</span>.</div>
+    <div class="kv" style="margin-top:8px"><span>Recorrido corregido</span><span class="mid" id="defSpan">—</span></div>
+    <div class="kv"><span>Paso entre kilómetros</span><span class="mid" id="defPaso">—</span></div>
+    <div id="defAviso" class="aviso"></div>
+
+    <div class="cajakm" style="margin-top:12px">
+      <div class="filalab">
+        <span class="lab">Punto a marcar</span>
+        <button id="defMenos" class="chico">−</button>
+        <button id="defMas" class="chico">+</button>
+      </div>
+      <div class="filakm">
+        <input id="defPunto" type="text" inputmode="decimal" autocomplete="off" value="1">
+        <button id="defIr" class="primary">Fijar</button>
+      </div>
+    </div>
+    <div class="kv" style="margin-top:8px"><span>Metro objetivo</span><span class="mid" id="defObj">—</span></div>
+    <div class="kv"><span>Te faltan</span><span class="big" id="defFalta" style="font-size:30px">—</span></div>
+    <div class="estadoBanda" id="defEstado" style="color:var(--muted)">Sin posición todavía</div>
+
+    <div class="acciones">
+      <button id="defMedir" class="primary grande" disabled>📍<br>Marcar punto<br>30 s</button>
+      <label class="boton grande" for="defEntorno">🏞️<br>Foto de<br>entorno
+        <input id="defEntorno" type="file" accept="image/*" capture="environment">
+      </label>
+    </div>
+    <div class="aviso" id="defInfo">Durante los 30 s se hace la foto perpendicular a la marca.
+      Después, dos fotos de entorno para el informe.</div>
+    <div class="tabla-wrap" style="margin-top:10px">
+      <table><thead><tr><th>Punto</th><th>Objetivo</th><th>Medido</th><th>Desv.</th><th>Fotos</th></tr></thead>
+        <tbody id="defCuerpo"><tr><td colspan="5" style="text-align:center;color:var(--muted);font-family:var(--sans)">Ninguno todavía</td></tr></tbody></table>
+    </div>
+    <button id="defCsv" class="suave" style="margin-top:8px">Descargar los puntos definitivos</button>
   </details>
 
   <details class="panel">
@@ -487,6 +547,7 @@ function pintarRol(){
   $('geoide').readOnly = !responsable;
   $('cotaConocida').readOnly = !responsable;
   pintarQuien();
+  pintarPaneles();
 }
 
 try {
@@ -500,6 +561,8 @@ $('quien').addEventListener('input', () => {
   try { localStorage.setItem('quienV06', $('quien').value); } catch(e){}
   $('quienInfo').textContent = 'Las fotos saldrán firmadas como ' + siglas() + '.';
   pintarQuien();
+  pintarPaneles();
+  pintarPaneles();
 });
 
 $('btnResp').addEventListener('click', () => { $('cajaPin').hidden = false; $('pin').focus(); });
@@ -571,6 +634,7 @@ document.addEventListener('input', e => {
 
 function pintar(s, desvio, prec){
   desvioActual = desvio;
+  if (typeof pintarDef === 'function' && !$('panelDef').hidden) pintarDef();
   sActual = s;
   $('metro').textContent = fmt(s,0) + ' m';
   $('kmof').textContent = fmt(s * 42.195 / L, 3);
@@ -702,6 +766,173 @@ function arrancarGps(){
 
 $('btnGps').addEventListener('click', arrancarGps);
 
+/* ================= PANELES RESERVADOS =================
+   Visibles para el responsable (PIN) y, el de puntos definitivos, también
+   para el homologador, que se identifica poniendo HOM en sus siglas. */
+
+function puedeVerPaneles(){ return responsable; }
+function puedeVerDefinitivos(){ return responsable || siglas() === 'HOM'; }
+
+function pintarPaneles(){
+  $('panelComp').hidden = !puedeVerPaneles();
+  $('panelDef').hidden = !puedeVerDefinitivos();
+}
+
+/* ---------- comparativa entre usuarios ---------- */
+async function cargarComparativa(){
+  if (!apiUrl){ $('compCuerpo').innerHTML = '<tr><td>Falta el enlace de la hoja.</td></tr>'; return; }
+  $('btnComp').disabled = true;
+  $('btnComp').textContent = 'Leyendo…';
+  try {
+    const r = await fetch(apiUrl + '?q=paradas', {cache: 'no-store'});
+    const j = await r.json();
+    if (!j || j.ok !== true) throw new Error('respuesta inesperada');
+    const buenas = j.filas.filter(f => f.fiable === 'sí' || f.fiable === 'pocas lecturas');
+    const usuarios = [...new Set(buenas.map(f => f.usuario || '—'))].sort();
+    const kms = [...new Set(buenas.map(f => f.km))].sort((a,b) => a-b);
+
+    $('compCab').innerHTML = '<tr><th>Km</th>' + usuarios.map(u => '<th>' + u + '</th>').join('')
+      + '<th>Media</th><th>Rango</th></tr>';
+    $('compCuerpo').innerHTML = kms.map(k => {
+      const fila = buenas.filter(f => f.km === k);
+      const vals = fila.map(f => f.s).filter(v => typeof v === 'number');
+      const med = vals.reduce((a,b) => a+b, 0) / (vals.length || 1);
+      const rango = vals.length > 1 ? Math.max(...vals) - Math.min(...vals) : 0;
+      const celdas = usuarios.map(u => {
+        const v = fila.filter(f => (f.usuario || '—') === u).map(f => f.s);
+        if (!v.length) return '<td style="color:var(--muted)">—</td>';
+        const x = v[v.length-1];
+        const lejos = vals.length > 1 && Math.abs(x - med) > 15;
+        return '<td' + (lejos ? ' style="color:var(--bad);font-weight:700"' : '') + '>' + fmt(x,0) + '</td>';
+      }).join('');
+      return '<tr><td><strong>' + k + '</strong></td>' + celdas +
+        '<td>' + fmt(med,0) + '</td>' +
+        '<td' + (rango > 20 ? ' style="color:var(--bad);font-weight:700"' : '') + '>' + fmt(rango,0) + ' m</td></tr>';
+    }).join('') || '<tr><td>Sin lecturas fiables todavía.</td></tr>';
+  } catch(err){
+    $('compCuerpo').innerHTML = '<tr><td>No se pudo leer la hoja: ' + err.message + '</td></tr>';
+  } finally {
+    $('btnComp').disabled = false;
+    $('btnComp').textContent = 'Actualizar';
+  }
+}
+$('btnComp').addEventListener('click', cargarComparativa);
+
+/* ---------- puntos definitivos ----------
+   Tras mover salida y meta, el recorrido útil pasa a medir
+   span = L + ajuste_salida + ajuste_meta, y cada kilómetro declarado ocupa
+   span/42,195 metros del trazado dibujado. El punto k va, por tanto, en
+   s = -ajuste_salida + k * paso. */
+let defs = [];
+try { defs = JSON.parse(localStorage.getItem('defsV06') || '[]'); } catch(e){ defs = []; }
+let defFotos = [];     // nombres de las fotos del punto que se está marcando
+let defActivo = false; // el velo está midiendo un punto definitivo
+
+function defAj(){
+  const a = parseFloat($('ajSalida').value), b = parseFloat($('ajMeta').value);
+  return {s: isFinite(a) ? a : 0, m: isFinite(b) ? b : 0};
+}
+function defSpan(){ const a = defAj(); return L + a.s + a.m; }
+function defPaso(){ return defSpan() / 42.195; }
+
+function defObjetivo(){
+  const v = ($('defPunto').value || '').trim().toUpperCase();
+  const a = defAj();
+  if (v === 'S') return {nombre: 'SALIDA', s: -a.s};
+  if (v === 'M') return {nombre: 'META', s: L + a.m};
+  const k = parseFloat(v.replace(',', '.'));
+  if (!isFinite(k)) return null;
+  if (k === 0) return {nombre: 'SALIDA', s: -a.s};
+  return {nombre: 'PK ' + (Number.isInteger(k) ? k : fmt(k,3)), s: -a.s + k * defPaso()};
+}
+
+function pintarDef(){
+  const a = defAj();
+  $('defSpan').textContent = fmt(defSpan(), 2) + ' m';
+  $('defPaso').textContent = fmt(defPaso(), 3) + ' m';
+  const o = defObjetivo();
+  const av = [];
+  if (a.s === 0 && a.m === 0) av.push('Sin ajuste: los puntos coinciden con los verdes (b) de antes.');
+  if (-a.s < 0) av.push('⚠️ La salida queda ' + fmt(a.s,0) + ' m antes del trazado dibujado: ese punto no se puede situar con el GPS de la app.');
+  if (L + a.m > L) av.push('⚠️ La meta queda ' + fmt(a.m,0) + ' m después del trazado dibujado: ese punto tampoco.');
+  $('defAviso').textContent = av.join(' ');
+
+  if (!o){ $('defObj').textContent = '—'; $('defFalta').textContent = '—'; return; }
+  $('defObj').textContent = fmt(o.s, 1) + ' m';
+  if (sActual == null){ $('defFalta').textContent = '—'; $('defEstado').textContent = 'Sin posición todavía'; return; }
+  const d = sActual - o.s;
+  $('defFalta').textContent = sig(d);
+  const ab = Math.abs(d);
+  const e = $('defEstado');
+  if (ab < 1){ e.textContent = '🎯 Estás sobre el punto. Marca aquí.'; e.style.color = 'var(--good)'; $('defFalta').style.color = 'var(--good)'; }
+  else if (ab < 5){ e.textContent = 'Muy cerca: ' + fmt(ab,1) + ' m ' + (d > 0 ? 'hacia atrás' : 'hacia delante') + '.'; e.style.color = 'var(--warn)'; $('defFalta').style.color = 'var(--warn)'; }
+  else { e.textContent = 'Avanza ' + fmt(ab,0) + ' m ' + (d > 0 ? 'hacia atrás' : 'hacia delante') + '.'; e.style.color = 'var(--muted)'; $('defFalta').style.color = 'var(--crema)'; }
+  $('defMedir').disabled = false;
+}
+
+function defSaltar(paso){
+  const v = ($('defPunto').value || '').trim().toUpperCase();
+  const k = v === 'S' ? 0 : v === 'M' ? 43 : Math.round(parseFloat(v.replace(',', '.')) || 0);
+  const n = Math.max(0, Math.min(43, k + paso));
+  $('defPunto').value = n === 0 ? 'S' : n === 43 ? 'M' : n;
+  pintarDef();
+}
+$('defMas').addEventListener('click', () => defSaltar(1));
+$('defMenos').addEventListener('click', () => defSaltar(-1));
+$('defIr').addEventListener('click', pintarDef);
+['ajSalida','ajMeta','defPunto'].forEach(id => $(id).addEventListener('input', () => {
+  try { localStorage.setItem('ajV06', JSON.stringify(defAj())); } catch(e){}
+  pintarDef();
+}));
+try { const g = JSON.parse(localStorage.getItem('ajV06') || 'null');
+  if (g){ $('ajSalida').value = g.s; $('ajMeta').value = g.m; } } catch(e){}
+
+function pintarDefTabla(){
+  const tb = $('defCuerpo');
+  if (!defs.length){ tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-family:var(--sans)">Ninguno todavía</td></tr>'; return; }
+  tb.innerHTML = defs.map(d => '<tr><td><strong>' + d.punto + '</strong></td><td>' + fmt(d.objetivo,1) +
+    '</td><td>' + fmt(d.s,1) + '</td><td' + (Math.abs(d.s - d.objetivo) > 2 ? ' style="color:var(--warn)"' : '') +
+    '>' + ((d.s-d.objetivo) >= 0 ? '+' : '−') + fmt(Math.abs(d.s-d.objetivo),2) + '</td><td>' + (d.fotos ? d.fotos.length : 0) + '</td></tr>').join('');
+}
+pintarDefTabla();
+
+$('defMedir').addEventListener('click', () => {
+  if (promediando) return;
+  defActivo = true; defFotos = [];
+  abrirVelo();
+  $('veloTxt').textContent = 'Punto definitivo ' + (defObjetivo() ? defObjetivo().nombre : '') +
+    '. Coloca el móvil a 1 m de altura, perpendicular sobre la marca, y no te muevas.';
+});
+
+$('defEntorno').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  const o = defObjetivo();
+  const n = defFotos.filter(x => x.indexOf('_ENT') >= 0).length + 1;
+  const nom = await guardarDisparo(f, false, (o ? o.nombre : 'DEF') + '_ENT' + n);
+  if (nom){
+    defFotos.push(nom);
+    const u = defs[defs.length - 1];
+    if (u && o && u.punto === o.nombre){ u.fotos = (u.fotos || []).concat([nom]); guardarDefs(); pintarDefTabla(); }
+    $('defInfo').textContent = 'Foto de entorno ' + n + ' guardada. ' + (n < 2 ? 'Haz una más desde otro ángulo.' : 'Ya tienes las dos.');
+  }
+});
+
+function guardarDefs(){ try { localStorage.setItem('defsV06', JSON.stringify(defs)); } catch(e){} }
+
+$('defCsv').addEventListener('click', () => {
+  const cab = 'punto;metro_objetivo;metro_medido;desviacion_m;lecturas;dispersion_m;desvio_eje_m;cota_m;lat;lon;fotos\n';
+  const cuerpo = defs.map(d => [d.punto, d.objetivo.toFixed(2), d.s.toFixed(2), (d.s-d.objetivo).toFixed(2),
+    d.lecturas ?? '', d.disp == null ? '' : d.disp.toFixed(1), d.desvio == null ? '' : d.desvio.toFixed(1),
+    d.cota == null ? '' : d.cota.toFixed(1), d.lat ?? '', d.lon ?? '', (d.fotos||[]).join(' | ')]
+    .join(';').replace(/\./g, ',')).join('\n');
+  const b = new Blob(['\uFEFF' + cab + cuerpo], {type: 'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b); a.download = 'puntos_definitivos_V06.csv'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+
 /* ---------- medición del punto ----------
    Treinta segundos quieto sobre la marca. El velo tapa la pantalla a propósito:
    si alguien sigue andando mientras mide, la media no vale para nada. */
@@ -754,7 +985,10 @@ async function disparar(){
   if (!b) return false;
   yaDisparo = true;
   $('veloEstado').textContent = 'Foto tomada · sigue sin moverte';
-  return guardarDisparo(b, true);
+  const o = defActivo ? defObjetivo() : null;
+  const nom = await guardarDisparo(b, true, o ? o.nombre + '_PERP' : null);
+  if (nom && defActivo) defFotos.push(nom);
+  return !!nom;
 }
 
 $('btnVeloFoto').addEventListener('click', disparar);
@@ -833,6 +1067,11 @@ function rematarMedida(){
   calcular();
   pintarMedida();
 
+  if (defActivo){
+    rematarDefinitivo(s, desv, disp, o.length);
+    return;
+  }
+
   if (desv != null && desv > DESVIO_CORTE){
     // No se registra: una posición a cientos de metros del trazado no es un punto
     // del recorrido, y colarla en la hoja contamina la media de todos.
@@ -843,6 +1082,28 @@ function rematarMedida(){
     return;
   }
   registrarParada(true);      // la medición es la parada: no hay que pulsar nada más
+}
+
+function rematarDefinitivo(s, desv, disp, n){
+  defActivo = false;
+  const o = defObjetivo();
+  if (!o){ verdicto('No hay punto definitivo seleccionado.', 'var(--bad)'); return; }
+  const N = parseFloat($('geoide').value);
+  const reg = {
+    hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    usuario: siglas(), punto: o.nombre, objetivo: o.s, s: s,
+    lecturas: n, disp: disp, desvio: desv,
+    cota: altActual == null ? null : altActual - (isFinite(N) ? N : 0) - hAntena(),
+    ajSalida: defAj().s, ajMeta: defAj().m, paso: defPaso(),
+    lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null,
+    fotos: defFotos.slice()
+  };
+  defs.push(reg); guardarDefs(); pintarDefTabla(); pintarDef();
+  colaD.push(reg); guardarCola(); pintarSync(); sincronizar(true);
+  const e = Math.abs(s - o.s);
+  const dd = s - o.s;
+  $('defInfo').textContent = o.nombre + ' marcado a ' + (dd >= 0 ? '+' : '−') + fmt(Math.abs(dd),2) + ' m del objetivo'
+    + (e < 2 ? ' ✅.' : ' ⚠️, revisa la marca.') + ' Ahora las dos fotos de entorno.';
 }
 
 /* Avisa si vas a registrar una parada sin haber medido el punto, o si te has
@@ -1141,9 +1402,9 @@ if (navigator.storage && navigator.storage.persist){
 
 /* Una sola ruta para todas las fotos: la del botón y la que se dispara durante
    la medición. m30 sólo marca el nombre del archivo, nunca la imagen. */
-async function guardarDisparo(fuente, m30){
+async function guardarDisparo(fuente, m30, sufijo){
   if (!bd) return;
-  const etq = etiquetaPunto();
+  const etq = sufijo ? sufijo : etiquetaPunto();
   const ahora = new Date();
   const yo = siglas();
   const detalle = (sActual == null ? 'sin posición' : 'metro ' + fmt(sActual, 0) + ' del trazado')
@@ -1152,16 +1413,18 @@ async function guardarDisparo(fuente, m30){
     + (ultimaCoord ? ' · ' + ultimaCoord.la.toFixed(6) + ', ' + ultimaCoord.lo.toFixed(6) : '');
   try {
     const blob = await procesarFoto(fuente, {titulo: etq + ' · Maratón Elche-Alicante V06', detalle});
+    let id = null;
     const dd = n => String(n).padStart(2, '0');
     const sello = ahora.getFullYear() + dd(ahora.getMonth()+1) + dd(ahora.getDate())
       + '_' + dd(ahora.getHours()) + dd(ahora.getMinutes()) + dd(ahora.getSeconds());
     const nombre = etq.replace(/[^0-9A-Za-z]+/g,'-') + '_' + yo + (m30 ? '_M30' : '') + '_' + sello + '.jpg';
-    await guardarFoto({
+    id = await guardarFoto({
       etiqueta: etq, usuario: yo, m30: !!m30, nombre: nombre,
       s: sActual, lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null,
       hora: ahora.toISOString(), blob
     });
-    idxFotos.push({etiqueta: etq, usuario: yo, m30: !!m30, nombre: nombre, size: blob.size});
+    idxFotos.push({id: id, etiqueta: etq, usuario: yo, m30: !!m30, nombre: nombre,
+                   size: blob.size, subida: false});
     guardarIdx();
     pintarTira();
     encolarFoto({
@@ -1170,12 +1433,12 @@ async function guardarDisparo(fuente, m30){
       s: sActual, peso: blob.size,
       lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null
     });
-    sincronizar(true);
-    return true;
+    sincronizar(true); subirFotos();
+    return nombre;
   } catch(err){
     $('avisoFotos').hidden = false;
     $('avisoFotos').textContent = 'No se pudo procesar la foto: ' + err.message;
-    return false;
+    return null;
   }
 }
 
@@ -1236,21 +1499,24 @@ let apiUrl = '';
 try { apiUrl = localStorage.getItem('apiV06') || API_POR_DEFECTO; } catch(e){ apiUrl = API_POR_DEFECTO; }
 $('urlApi').value = apiUrl;
 
-let cola = [], colaF = [];
+let cola = [], colaF = [], colaD = [];
 try { cola = JSON.parse(localStorage.getItem('colaV06') || '[]'); } catch(e){ cola = []; }
 try { colaF = JSON.parse(localStorage.getItem('colaFotosV06') || '[]'); } catch(e){ colaF = []; }
+try { colaD = JSON.parse(localStorage.getItem('colaDefV06') || '[]'); } catch(e){ colaD = []; }
 function guardarCola(){
   try {
     localStorage.setItem('colaV06', JSON.stringify(cola));
     localStorage.setItem('colaFotosV06', JSON.stringify(colaF));
+    localStorage.setItem('colaDefV06', JSON.stringify(colaD));
   } catch(e){}
 }
 
 function pintarSync(){
-  const n = cola.length + colaF.length;
-  $('pend').textContent = n;
-  $('pend').style.color = n ? 'var(--warn)' : 'var(--good)';
-  $('btnSync').disabled = !n || !apiUrl;
+  const n = cola.length + colaF.length + colaD.length;
+  const nf = typeof pendientesSubida === 'function' ? pendientesSubida() : 0;
+  $('pend').textContent = nf ? n + ' + ' + nf + ' 📷' : n;
+  $('pend').style.color = (n || nf) ? 'var(--warn)' : 'var(--good)';
+  $('btnSync').disabled = (!n && !nf) || !apiUrl;
   if (!apiUrl) $('syncInfo').textContent = 'Falta el enlace del Apps Script. Pulsa «Cambiar enlace» y pégalo.';
 }
 
@@ -1269,28 +1535,29 @@ function encolarFoto(f){ colaF.push(f); guardarCola(); pintarSync(); }
 
 let enviando = false;
 async function sincronizar(silencio){
-  const total0 = cola.length + colaF.length;
+  const total0 = cola.length + colaF.length + colaD.length;
   if (enviando || !total0 || !apiUrl) return;
   if (!navigator.onLine){ if (!silencio) $('syncInfo').textContent = 'Sin cobertura. Quedan ' + total0 + ' por enviar.'; return; }
   enviando = true;
   $('btnSync').disabled = true;
-  const lote = cola.slice(), loteF = colaF.slice();
+  const lote = cola.slice(), loteF = colaF.slice(), loteD = colaD.slice();
   try {
     const r = await fetch(apiUrl, {
       method: 'POST',
       headers: {'Content-Type': 'text/plain;charset=utf-8'},   // petición simple: sin preflight
-      body: JSON.stringify({version: 'V06', paradas: lote, fotos: loteF})
+      body: JSON.stringify({version: 'V06', paradas: lote, fotos: loteF, definitivos: loteD})
     });
     const j = await r.json();
     if (!j || j.ok !== true) throw new Error(j && j.error ? j.error : 'respuesta inesperada');
     cola = cola.slice(lote.length);
     colaF = colaF.slice(loteF.length);
+    colaD = colaD.slice(loteD.length);
     guardarCola();
     const h = new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
     try { localStorage.setItem('ultEnvV06', h); } catch(e){}
-    const n = lote.length + loteF.length;
+    const n = lote.length + loteF.length + loteD.length;
     $('ultEnv').textContent = h + ' · ' + n + (n === 1 ? ' fila' : ' filas');
-    const q = cola.length + colaF.length;
+    const q = cola.length + colaF.length + colaD.length;
     $('syncInfo').textContent = 'Enviado a la hoja. ' + (q ? q + ' pendientes todavía.' : 'Todo al día.');
   } catch(err){
     $('syncInfo').textContent = 'No se pudo enviar (' + err.message + '). Quedan ' + (cola.length + colaF.length) +
@@ -1301,9 +1568,57 @@ async function sincronizar(silencio){
   }
 }
 
-$('btnSync').addEventListener('click', () => sincronizar());
-window.addEventListener('online', () => sincronizar(true));
-setInterval(() => sincronizar(true), 60000);
+/* ---------- subida de las imágenes a Drive ----------
+   Una foto pesa mil veces más que una fila. Van de una en una y sólo cuando
+   la cola de datos está vacía: lo que decide la homologación son las paradas,
+   y no pueden quedarse esperando detrás de una imagen atascada. */
+let subiendo = false;
+
+function leerFoto(id){
+  return new Promise(res => { const q = tx('readonly').get(id);
+    q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); });
+}
+
+function aBase64(blob){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result).split(',')[1]);
+    fr.onerror = () => rej(new Error('no se pudo leer la foto'));
+    fr.readAsDataURL(blob);
+  });
+}
+
+function pendientesSubida(){ return idxFotos.filter(f => !f.subida && f.id != null).length; }
+
+async function subirFotos(){
+  if (subiendo || !apiUrl || !navigator.onLine) return;
+  if (cola.length || colaF.length || colaD.length) return;   // los datos, primero
+  const f = idxFotos.find(x => !x.subida && x.id != null);
+  if (!f) return;
+  subiendo = true;
+  try {
+    const reg = await leerFoto(f.id);
+    if (!reg || !reg.blob){ f.subida = true; guardarIdx(); return; }
+    const b64 = await aBase64(reg.blob);
+    const r = await fetch(apiUrl, {
+      method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({imagen: {nombre: f.nombre, b64: b64}})
+    });
+    const j = await r.json();
+    if (!j || j.ok !== true) throw new Error(j && j.error ? j.error : 'respuesta inesperada');
+    f.subida = true; guardarIdx();
+    pintarSync(); pintarTira();
+  } catch(err){
+    // se queda pendiente y se reintenta; no se avisa en pantalla para no
+    // confundir con un fallo de los datos, que es lo que sí importa
+  } finally {
+    subiendo = false;
+  }
+}
+
+$('btnSync').addEventListener('click', () => { sincronizar(); subirFotos(); });
+window.addEventListener('online', () => { sincronizar(true); subirFotos(); });
+setInterval(() => { sincronizar(true); subirFotos(); }, 20000);
 try { const u = localStorage.getItem('ultEnvV06'); if (u) $('ultEnv').textContent = u; } catch(e){}
 pintarSync();
 sincronizar(true);
