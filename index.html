@@ -156,7 +156,7 @@ details.panel>*:last-child{margin-bottom:14px}
   <div class="cabecera">
     <h1>Control de homologación</h1>
     <p class="sub">Maratón Elche–Alicante · V06 · <span class="num">42.507,89 m</span> · <span id="quienCab">—</span>
-      · <span class="num" id="version">v18</span></p>
+      · <span class="num" id="version">v19</span></p>
   </div>
 
   <!-- Todo lo que se usa en cada parada cabe aquí, sin bajar la pantalla. -->
@@ -420,7 +420,14 @@ const REF = [
   ['40b',    40296.6,  5.7],
   ['Meta',   42507.9,  4.2]
 ];
-const TOL_REF = 150;   // m a lo largo del eje para considerar que estás en el punto
+const TOL_REF = 150;
+
+/* Fuera de ruta: la proyección siempre devuelve un punto del trazado, esté uno
+   donde esté. Sin este control, alguien a 5 km de distancia obtiene un metro
+   con toda naturalidad, que es exactamente lo que pasó en la prueba del PK 42. */
+const DESVIO_AVISO = 30;     // ya no estás sobre la línea
+const DESVIO_CORTE = 75;     // no es una medición del recorrido
+let desvioActual = null;   // m a lo largo del eje para considerar que estás en el punto
 
 try { const g = localStorage.getItem('geoideV06'); if (g) $('geoide').value = g; } catch(e){}
 
@@ -563,6 +570,7 @@ document.addEventListener('input', e => {
 });
 
 function pintar(s, desvio, prec){
+  desvioActual = desvio;
   sActual = s;
   $('metro').textContent = fmt(s,0) + ' m';
   $('kmof').textContent = fmt(s * 42.195 / L, 3);
@@ -572,6 +580,25 @@ function pintar(s, desvio, prec){
 
   if (typeof pintarMedida === 'function') pintarMedida();
   $('btnReg').disabled = false;
+
+  if (desvio != null && desvio > DESVIO_AVISO){
+    $('banda').hidden = true;
+    $('celdaB').hidden = true;
+    $('labA').textContent = 'Separación del recorrido';
+    $('dA').textContent = fmt(desvio, 0) + ' m';
+    $('dA').style.color = 'var(--bad)';
+    const eb = $('estadoBanda');
+    eb.style.color = 'var(--bad)';
+    eb.textContent = desvio > DESVIO_CORTE
+      ? '⛔ Estás a ' + fmt(desvio,0) + ' m del recorrido. Esta posición no vale como medición.'
+      : '⚠️ Estás a ' + fmt(desvio,0) + ' m del eje. Acércate a la línea del recorrido.';
+    $('proy').textContent = '—';
+    verdicto(desvio > DESVIO_CORTE
+      ? 'Fuera del recorrido: nada de lo que calcule aquí significa nada.'
+      : 'Demasiado separado del eje para que la proyección sea fiable.', 'var(--bad)');
+    pistaRef();
+    return;
+  }
 
   const esp = modo();
   if (esp !== 'pk'){
@@ -651,6 +678,7 @@ function arrancarGps(){
     const r = localizar(la, lo, ref);
     if (promediando){
       buffer.push(r.s);
+      bufDes.push(r.desvio);
       if (al != null) bufAlt.push(al);
       $('estado').textContent = 'Promediando… ' + buffer.length + ' lecturas';
     }
@@ -744,7 +772,7 @@ $('btnProm').addEventListener('click', () => { if (!promediando) abrirVelo(); })
 $('btnVeloNo').addEventListener('click', cerrarVelo);
 
 $('btnVeloSi').addEventListener('click', () => {
-  promediando = true; buffer = []; bufAlt = [];
+  promediando = true; buffer = []; bufAlt = []; bufDes = [];
   $('btnProm').disabled = true;
   $('velo').classList.add('midiendo');
   $('veloTit').textContent = '⚠️ No te muevas';
@@ -789,9 +817,10 @@ function rematarMedida(){
   const o = buffer.slice().sort((x,y) => x-y);
   const disp = o[o.length-1] - o[0];
   const s = mediana(buffer);
-  pintar(s, 0, null);
-  $('desvio').textContent = '—';
-  medidaEn = {s: s, t: Date.now()};
+  const desv = bufDes.length ? mediana(bufDes) : null;
+  pintar(s, desv, null);
+  $('desvio').textContent = desv == null ? '—' : fmt(desv,1) + ' m';
+  medidaEn = {s: s, t: Date.now(), n: o.length, disp: disp, desvio: desv};
 
   let txt = 'Punto medido · ' + o.length + ' lecturas · dispersión ' + fmt(disp,0) + ' m';
   if (bufAlt.length){
@@ -803,6 +832,16 @@ function rematarMedida(){
   $('estado').textContent = txt;
   calcular();
   pintarMedida();
+
+  if (desv != null && desv > DESVIO_CORTE){
+    // No se registra: una posición a cientos de metros del trazado no es un punto
+    // del recorrido, y colarla en la hoja contamina la media de todos.
+    avisoHasta = 0;
+    verdicto('⛔ No registrada: estás a ' + fmt(desv,0) + ' m del recorrido. '
+      + 'Si de verdad quieres guardarla, usa «Registrar a mano».', 'var(--bad)');
+    avisoHasta = Date.now() + 15000;
+    return;
+  }
   registrarParada(true);      // la medición es la parada: no hay que pulsar nada más
 }
 
@@ -1052,24 +1091,53 @@ function pintarTabla(){
 }
 pintarTabla();
 
+/* Con 84 fotos, releer todos los blobs en cada repintado son 12 MB de memoria
+   cada vez. El índice ligero vive aparte y sólo se cargan las 8 últimas. */
+let idxFotos = [];
+try { idxFotos = JSON.parse(localStorage.getItem('idxFotosV06') || '[]'); } catch(e){ idxFotos = []; }
+function guardarIdx(){ try { localStorage.setItem('idxFotosV06', JSON.stringify(idxFotos)); } catch(e){} }
+
+function ultimasFotos(n){
+  return new Promise(res => {
+    const out = [];
+    const q = tx('readonly').openCursor(null, 'prev');
+    q.onsuccess = e => {
+      const c = e.target.result;
+      if (!c || out.length >= n) return res(out.reverse());
+      out.push(c.value); c.continue();
+    };
+    q.onerror = () => res([]);
+  });
+}
+
+let urlsTira = [];
 async function pintarTira(){
   if (!bd) return;
-  const fotos = await leerFotos();
   const t = $('tira'), av = $('avisoFotos');
-  t.hidden = !fotos.length; av.hidden = !fotos.length;
-  $('btnZip').disabled = !fotos.length && !paradas.length;
-  if (!fotos.length){ t.innerHTML = ''; return; }
-  t.innerHTML = fotos.slice(-12).map(f =>
-    '<figure><img alt="' + f.etiqueta + '" src="' + URL.createObjectURL(f.blob) + '">' +
-    '<figcaption>' + f.etiqueta + (f.m30 ? ' · 30s' : '') + (f.usuario ? ' · ' + f.usuario : '') + '</figcaption></figure>').join('');
-  const bytes = fotos.reduce((a, f) => a + f.blob.size, 0);
+  const n = idxFotos.length;
+  t.hidden = !n; av.hidden = !n;
+  $('btnZip').disabled = !n && !paradas.length;
+  urlsTira.forEach(u => URL.revokeObjectURL(u));
+  urlsTira = [];
+  if (!n){ t.innerHTML = ''; return; }
+  const fotos = await ultimasFotos(8);
+  t.innerHTML = fotos.map(f => {
+    const u = URL.createObjectURL(f.blob); urlsTira.push(u);
+    return '<figure><img alt="' + f.etiqueta + '" src="' + u + '">' +
+    '<figcaption>' + f.etiqueta + (f.m30 ? ' · 30s' : '') + (f.usuario ? ' · ' + f.usuario : '') + '</figcaption></figure>';
+  }).join('');
+  const bytes = idxFotos.reduce((a, f) => a + (f.size || 0), 0);
   const peso = bytes < 1048576 ? fmt(bytes / 1024, 0) + ' KB' : fmt(bytes / 1048576, 1) + ' MB';
-  av.textContent = fotos.length === 1
-    ? '1 foto guardada en el móvil · ' + peso
-    : fotos.length + ' fotos guardadas en el móvil · ' + peso;
+  av.textContent = (n === 1 ? '1 foto guardada en el móvil · ' : n + ' fotos guardadas en el móvil · ') + peso
+    + (n >= 20 ? ' · conviene descargar el paquete de vez en cuando' : '');
 }
 
 abrirBD().then(x => { bd = x; pintarTira(); });
+
+/* Sin esto, el navegador puede tirar las fotos si el móvil anda justo de sitio. */
+if (navigator.storage && navigator.storage.persist){
+  navigator.storage.persisted().then(ya => { if (!ya) navigator.storage.persist().catch(()=>{}); }).catch(()=>{});
+}
 
 /* Una sola ruta para todas las fotos: la del botón y la que se dispara durante
    la medición. m30 sólo marca el nombre del archivo, nunca la imagen. */
@@ -1093,6 +1161,8 @@ async function guardarDisparo(fuente, m30){
       s: sActual, lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null,
       hora: ahora.toISOString(), blob
     });
+    idxFotos.push({etiqueta: etq, usuario: yo, m30: !!m30, nombre: nombre, size: blob.size});
+    guardarIdx();
     pintarTira();
     encolarFoto({
       hora: ahora.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
@@ -1136,6 +1206,9 @@ function registrarParada(auto){
     km: isFinite(km) ? km : null,
     usuario: siglas(),
     medido: medidaFresca(),
+    lecturas: medidaFresca() ? medidaEn.n : null,
+    disp: medidaFresca() ? medidaEn.disp : null,
+    desvio: desvioActual,
     s: sActual, pk: esp === 'salida' ? 'SALIDA' : esp === 'meta' ? 'META' : k,
     dA: sActual - sA, dB: sActual - sB,
     cota: altActual == null ? null : altActual - (isFinite(N) ? N : 0) - hAntena(),
@@ -1237,12 +1310,15 @@ sincronizar(true);
 
 $('btnBorrar').addEventListener('click', async () => {
   paradas = []; guardar(); pintarTabla();
-  if (bd){ await vaciarFotos(); pintarTira(); }
+  if (bd){ await vaciarFotos();
+  idxFotos = []; guardarIdx(); pintarTira(); }
 });
 
 function csv(){
-  const cab = 'hora;usuario;medido_30s;km_homologador;metro_trazado;pk;dist_a_A_m;dist_a_B_m;cota_gps_m;dispersion_cota_m;lat;lon;longitud_previsible_m\n';
-  const cuerpo = paradas.map(p => [p.hora, p.usuario ?? '', p.medido ? 'si' : 'no', p.km ?? '', p.s.toFixed(1), p.pk,
+  const cab = 'hora;usuario;medido_30s;lecturas;dispersion_metro_m;desvio_eje_m;km_homologador;metro_trazado;pk;dist_a_A_m;dist_a_B_m;cota_gps_m;dispersion_cota_m;lat;lon;longitud_previsible_m\n';
+  const cuerpo = paradas.map(p => [p.hora, p.usuario ?? '', p.medido ? 'si' : 'no',
+    p.lecturas ?? '', p.disp == null ? '' : p.disp.toFixed(1), p.desvio == null ? '' : p.desvio.toFixed(1),
+    p.km ?? '', p.s.toFixed(1), p.pk,
       p.dA.toFixed(1), p.dB.toFixed(1),
       p.cota == null ? '' : p.cota.toFixed(1), p.cotaDisp == null ? '' : p.cotaDisp.toFixed(1),
       p.lat == null ? '' : p.lat.toFixed(7), p.lon == null ? '' : p.lon.toFixed(7),
