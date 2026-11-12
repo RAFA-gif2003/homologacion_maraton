@@ -1,7 +1,7 @@
 // La app funciona sin red, pero la página en sí se pide siempre a la red cuando
 // la hay: con caché primero, una versión nueva tardaba dos aperturas en entrar,
 // o no entraba. La caché queda como red de seguridad para los tramos sin cobertura.
-const CACHE = 'homologacion-v06-22';
+const CACHE = 'homologacion-v06-23';
 const FICHEROS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
