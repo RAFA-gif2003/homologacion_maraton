@@ -131,6 +131,11 @@ footer{font-size:11.5px;color:var(--muted);line-height:1.5}
 .chico{flex:0 0 auto;width:auto;padding:4px 10px;font-size:11.5px;border-color:var(--line);color:var(--muted)}
 .chico.activo{border-color:var(--teal);color:var(--teal);background:rgba(0,175,154,.12)}
 .suave{margin-top:8px;border-color:var(--line);color:var(--muted);font-size:12px;padding:9px}
+.rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:4px;margin-top:6px}
+.rejilla span{font-family:var(--mono);font-size:11px;text-align:center;padding:5px 2px;
+  border:1px solid var(--line);color:var(--muted);cursor:pointer}
+.rejilla span.hecho{border-color:var(--teal);background:rgba(0,175,154,.18);color:var(--crema);font-weight:700}
+.rejilla span.ahora{outline:2px solid var(--cian)}
 .acciones .grande{font-size:16px;line-height:1.25;padding:12px 10px;min-height:86px}
 label.boton.grande{display:flex;align-items:center;justify-content:center}
 
@@ -156,7 +161,7 @@ details.panel>*:last-child{margin-bottom:14px}
   <div class="cabecera">
     <h1>Control de homologación</h1>
     <p class="sub">Maratón Elche–Alicante · V06 · <span class="num">42.507,89 m</span> · <span id="quienCab">—</span>
-      · <span class="num" id="version">v20</span></p>
+      · <span class="num" id="version">v21</span></p>
   </div>
 
   <!-- Todo lo que se usa en cada parada cabe aquí, sin bajar la pantalla. -->
@@ -183,6 +188,7 @@ details.panel>*:last-child{margin-bottom:14px}
       <div class="marca" id="marca" style="left:50%"></div>
     </div>
     <div class="estadoBanda" id="estadoBanda" style="color:var(--muted)">Sin posición todavía</div>
+    <div class="aviso" id="calle" hidden style="margin-top:2px"></div>
     <div class="grid2" style="margin-top:6px">
       <div id="celdaA"><span class="lab" id="labA">Al azul</span> <span class="mid" id="dA" style="color:var(--a);font-size:19px">—</span></div>
       <div id="celdaB"><span class="lab" id="labB">Al verde</span> <span class="mid" id="dB" style="color:var(--b);font-size:19px">—</span></div>
@@ -327,6 +333,7 @@ details.panel>*:last-child{margin-bottom:14px}
       </div>
     </div>
     <div class="kv" style="margin-top:8px"><span>Metro objetivo</span><span class="mid" id="defObj">—</span></div>
+    <div class="aviso" id="defMov" hidden></div>
     <div class="kv"><span>Te faltan</span><span class="big" id="defFalta" style="font-size:30px">—</span></div>
     <div class="estadoBanda" id="defEstado" style="color:var(--muted)">Sin posición todavía</div>
 
@@ -338,6 +345,8 @@ details.panel>*:last-child{margin-bottom:14px}
     </div>
     <div class="aviso" id="defInfo">Durante los 30 s se hace la foto perpendicular a la marca.
       Después, dos fotos de entorno para el informe.</div>
+    <div class="lab" style="margin-top:14px">Puntos marcados</div>
+    <div class="rejilla" id="defLista"></div>
     <div class="tabla-wrap" style="margin-top:10px">
       <table><thead><tr><th>Punto</th><th>Objetivo</th><th>Medido</th><th>Desv.</th><th>Fotos</th></tr></thead>
         <tbody id="defCuerpo"><tr><td colspan="5" style="text-align:center;color:var(--muted);font-family:var(--sans)">Ninguno todavía</td></tr></tbody></table>
@@ -421,6 +430,24 @@ const lat0 = VIA[0][0], lon0 = VIA[0][1];
 const KLAT = 111132.95, KLON = 111320 * Math.cos(lat0 * Math.PI / 180);
 const XY = VIA.map(p => [(p[1] - lon0) * KLON, (p[0] - lat0) * KLAT, p[2]]);
 
+/* Si la salida se retrasa o la meta se adelanta, el punto nuevo cae fuera del
+   trazado dibujado. En vez de tocar el KML, prolongamos la recta de los dos
+   extremos 400 m, siguiendo la dirección del primer y del último tramo. Para
+   unas decenas de metros la calle sigue recta y la aproximación vale; más allá
+   deja de valer, y por eso no se prolonga más. */
+const PROLONGA = 400;
+(function prolongar(){
+  const alarga = (a, b, largo, s) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1;
+    return [b[0] + dx/d*largo, b[1] + dy/d*largo, s];
+  };
+  const p0 = XY[0], p1 = XY[1];
+  XY.unshift(alarga(p1, p0, PROLONGA, -PROLONGA));
+  const n = XY.length;
+  const q1 = XY[n-2], q0 = XY[n-1];
+  XY.push(alarga(q1, q0, PROLONGA, q0[2] + PROLONGA));
+})();
+
 // El trazado se cruza consigo mismo en Elche y en el bucle final de Alicante:
 // dos pasadas distintas pueden quedar a pocos metros. Buscamos varios candidatos
 // y elegimos con el kilómetro declarado o con la continuidad de la lectura anterior.
@@ -480,6 +507,11 @@ const REF = [
   ['40b',    40296.6,  5.7],
   ['Meta',   42507.9,  4.2]
 ];
+/* Calles de cada punto, geocodificadas sobre las coordenadas del V06 (OSM).
+   Los tramos 23-24, 26, 28 y 31 se dan por la N-340 al quedar entre puntos
+   consultados que sí lo son; el resto está comprobado uno a uno. */
+const calles = {"SALIDA": "c/ Diagonal del Palau (la Vila)", "PK 1": "Av. de la Llibertat (Pont Nou)", "PK 2": "Av. Alcalde Vicente Quiles (Candalix)", "PK 3": "Av. de la Universitat d'Elx (Altabix)", "PK 4": "Av. de la Universitat d'Elx (Universitat)", "PK 5": "Av. de la Universitat d'Elx (Universitat)", "PK 6": "Av. de la Universitat d'Elx (Altabix)", "PK 7": "Av. Alcalde Vicente Quiles (la Rata)", "PK 8": "Av. de la Llibertat (Pont Nou)", "PK 9": "c/ Redován (Cementeri)", "PK 10": "N-340 (Hospital del Vinalopó)", "PK 11": "c/ Pere Joan Perpinyà (l'Asil)", "PK 12": "c/ Mariano Soler Olmos (la Portalada)", "PK 13": "c/ de l'Avet (Porta de la Morera)", "PK 14": "c/ Curtidors (Porta de la Morera)", "PK 15": "c/ Pere Joan Perpinyà (l'Asil)", "PK 16": "N-340 (Hospital del Vinalopó)", "PK 17": "c/ Reina Victoria (el Pla)", "PK 18": "Plaça de Baix (el Salvador)", "PK 19": "Av. d'Alacant (Torreta Verdi)", "PK 20": "Av. d'Alacant (Polígon Altabix)", "PK 21": "Av. d'Alacant (P.I. Altabix)", "PK 22": "N-340 (Jubalcoi)", "PK 23": "N-340 (Jubalcoi)", "PK 24": "N-340 (Jubalcoi)", "PK 25": "N-340 (Jubalcoi)", "PK 26": "N-340 (Torrellano)", "PK 27": "N-340 (Torrellano)", "PK 28": "N-340 (Torrellano)", "PK 29": "N-340 (Torrellano)", "PK 30": "N-340 (Torrellano)", "PK 31": "N-340 (Torrellano)", "PK 32": "N-340 (Elx)", "PK 33": "Av. d'Elx (P.I. Aigua Amarga)", "PK 34": "Av. d'Elx (P.I. Aigua Amarga)", "PK 35": "Av. d'Elx (Aigua Amarga)", "PK 36": "Av. d'Elx (El Palmeral)", "PK 37": "Av. d'Elx (Sant Gabriel)", "PK 38": "Av. d'Elx (Gran Via Sud)", "PK 39": "Av. d'Elx (Benalúa)", "PK 40": "Av. Perfecto Palacio de la Fuente", "PK 41": "Av. de Loring (Raval de Sant Francesc)", "PK 42": "Passeig del Port (Centre Històric)", "META": "Passeig del Port · Muelle 12 (Puerto)"};
+
 const TOL_REF = 150;
 
 /* Fuera de ruta: la proyección siempre devuelve un punto del trazado, esté uno
@@ -644,6 +676,9 @@ function pintar(s, desvio, prec){
 
   if (typeof pintarMedida === 'function') pintarMedida();
   $('btnReg').disabled = false;
+  const nc = calles[etiquetaPunto()];
+  $('calle').textContent = nc || '';
+  $('calle').hidden = !nc;
 
   if (desvio != null && desvio > DESVIO_AVISO){
     $('banda').hidden = true;
@@ -858,7 +893,25 @@ function pintarDef(){
   $('defAviso').textContent = av.join(' ');
 
   if (!o){ $('defObj').textContent = '—'; $('defFalta').textContent = '—'; return; }
-  $('defObj').textContent = fmt(o.s, 1) + ' m';
+  $('defObj').textContent = fmt(o.s, 1) + ' m' + (calles[o.nombre] ? ' · ' + calles[o.nombre] : '');
+  pintarDefLista();
+
+  // En salida y meta interesa además comprobar que nos hemos movido lo declarado.
+  const mv = $('defMov');
+  if (o.nombre === 'SALIDA' || o.nombre === 'META'){
+    const ref = o.nombre === 'SALIDA' ? 0 : L;
+    const decl = o.nombre === 'SALIDA' ? -defAj().s : defAj().m;
+    mv.hidden = false;
+    if (sActual == null){
+      mv.textContent = 'Declarado: ' + (decl >= 0 ? '+' : '−') + fmt(Math.abs(decl),2) +
+        ' m respecto a la ' + o.nombre.toLowerCase() + ' dibujada.';
+    } else {
+      const real = sActual - ref;
+      mv.textContent = 'Declarado ' + (decl >= 0 ? '+' : '−') + fmt(Math.abs(decl),2) +
+        ' m; ahora mismo estás a ' + (real >= 0 ? '+' : '−') + fmt(Math.abs(real),2) +
+        ' m de la ' + o.nombre.toLowerCase() + ' dibujada.';
+    }
+  } else mv.hidden = true;
   if (sActual == null){ $('defFalta').textContent = '—'; $('defEstado').textContent = 'Sin posición todavía'; return; }
   const d = sActual - o.s;
   $('defFalta').textContent = sig(d);
@@ -887,6 +940,26 @@ $('defIr').addEventListener('click', pintarDef);
 try { const g = JSON.parse(localStorage.getItem('ajV06') || 'null');
   if (g){ $('ajSalida').value = g.s; $('ajMeta').value = g.m; } } catch(e){}
 
+function pintarDefLista(){
+  const act = ($('defPunto').value || '').trim().toUpperCase();
+  const hechos = new Set(defs.map(d => d.punto));
+  const items = ['SALIDA'];
+  for (let k = 1; k <= 42; k++) items.push('PK ' + k);
+  items.push('META');
+  $('defLista').innerHTML = items.map(n => {
+    const etq = n === 'SALIDA' ? 'S' : n === 'META' ? 'M' : n.slice(3);
+    const esAct = (act === 'S' && n === 'SALIDA') || (act === 'M' && n === 'META') || act === etq;
+    return '<span class="' + (hechos.has(n) ? 'hecho ' : '') + (esAct ? 'ahora' : '') +
+      '" data-p="' + etq + '">' + etq + '</span>';
+  }).join('');
+}
+$('defLista').addEventListener('click', e => {
+  const v = e.target.getAttribute && e.target.getAttribute('data-p');
+  if (!v) return;
+  $('defPunto').value = v;
+  pintarDef();
+});
+
 function pintarDefTabla(){
   const tb = $('defCuerpo');
   if (!defs.length){ tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-family:var(--sans)">Ninguno todavía</td></tr>'; return; }
@@ -895,6 +968,7 @@ function pintarDefTabla(){
     '>' + ((d.s-d.objetivo) >= 0 ? '+' : '−') + fmt(Math.abs(d.s-d.objetivo),2) + '</td><td>' + (d.fotos ? d.fotos.length : 0) + '</td></tr>').join('');
 }
 pintarDefTabla();
+pintarDefLista();
 
 $('defMedir').addEventListener('click', () => {
   if (promediando) return;
@@ -922,8 +996,8 @@ $('defEntorno').addEventListener('change', async e => {
 function guardarDefs(){ try { localStorage.setItem('defsV06', JSON.stringify(defs)); } catch(e){} }
 
 $('defCsv').addEventListener('click', () => {
-  const cab = 'punto;metro_objetivo;metro_medido;desviacion_m;lecturas;dispersion_m;desvio_eje_m;cota_m;lat;lon;fotos\n';
-  const cuerpo = defs.map(d => [d.punto, d.objetivo.toFixed(2), d.s.toFixed(2), (d.s-d.objetivo).toFixed(2),
+  const cab = 'punto;calle;metro_objetivo;metro_medido;desviacion_m;lecturas;dispersion_m;desvio_eje_m;cota_m;lat;lon;fotos\n';
+  const cuerpo = defs.map(d => [d.punto, d.calle || '', d.objetivo.toFixed(2), d.s.toFixed(2), (d.s-d.objetivo).toFixed(2),
     d.lecturas ?? '', d.disp == null ? '' : d.disp.toFixed(1), d.desvio == null ? '' : d.desvio.toFixed(1),
     d.cota == null ? '' : d.cota.toFixed(1), d.lat ?? '', d.lon ?? '', (d.fotos||[]).join(' | ')]
     .join(';').replace(/\./g, ',')).join('\n');
@@ -1091,14 +1165,14 @@ function rematarDefinitivo(s, desv, disp, n){
   const N = parseFloat($('geoide').value);
   const reg = {
     hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
-    usuario: siglas(), punto: o.nombre, objetivo: o.s, s: s,
+    usuario: siglas(), punto: o.nombre, calle: calles[o.nombre] || '', objetivo: o.s, s: s,
     lecturas: n, disp: disp, desvio: desv,
     cota: altActual == null ? null : altActual - (isFinite(N) ? N : 0) - hAntena(),
     ajSalida: defAj().s, ajMeta: defAj().m, paso: defPaso(),
     lat: ultimaCoord ? ultimaCoord.la : null, lon: ultimaCoord ? ultimaCoord.lo : null,
     fotos: defFotos.slice()
   };
-  defs.push(reg); guardarDefs(); pintarDefTabla(); pintarDef();
+  defs.push(reg); guardarDefs(); pintarDefTabla(); pintarDefLista(); pintarDef();
   colaD.push(reg); guardarCola(); pintarSync(); sincronizar(true);
   const e = Math.abs(s - o.s);
   const dd = s - o.s;
