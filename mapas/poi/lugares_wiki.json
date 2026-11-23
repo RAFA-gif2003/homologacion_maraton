@@ -21,9 +21,17 @@
   "nombre": "Ayuntamiento de Elche",
   "sub": "Plaça de Baix · Casa Consistorial (s. XV)",
   "wiki": [
-   "es:Casa Consistorial de Elche",
-   "es:Ayuntamiento de Elche"
-  ]
+   "es:Casa consistorial de Elche"
+  ],
+  "pagina": "es:Casa consistorial de Elche",
+  "lat_wiki": 38.26542778,
+  "lon_wiki": -0.69879444,
+  "archivo": "Ajuntament_d'Elx,_País_Valencià._J._Laurent_1870.jpg",
+  "autor": "Jean Laurent",
+  "licencia": "Public domain",
+  "url_lic": "",
+  "url_pag": "https://commons.wikimedia.org/wiki/File:Ajuntament_d%27Elx,_Pa%C3%ADs_Valenci%C3%A0._J._Laurent_1870.jpg",
+  "foto": "mapas/poi/ayto_elche.jpg"
  },
  {
   "id": "santa_maria",
@@ -152,6 +160,8 @@
   ],
   "pagina": "es:Casa Mediterráneo",
   "archivo": "J29_439_ex_Bf_Alicante-Benalúa_(cropped).jpg",
+  "lat_wiki": 38.33777777777778,
+  "lon_wiki": -0.49333333333333335,
   "autor": "Falk2",
   "licencia": "CC BY-SA 4.0",
   "url_lic": "https://creativecommons.org/licenses/by-sa/4.0",
@@ -197,17 +207,16 @@
   "nombre": "Ayuntamiento de Alicante",
   "sub": "Casa Consistorial barroca (s. XVIII)",
   "wiki": [
-   "es:Ayuntamiento de Alicante",
-   "es:Casa Consistorial de Alicante"
+   "es:Casa consistorial de Alicante"
   ],
-  "pagina": "es:Ayuntamiento de Alicante",
-  "lat_wiki": 38.34524599,
-  "lon_wiki": -0.48129752,
-  "archivo": "España_Alicante_Ayuntamiento_2023.svg",
-  "autor": "User:Luispaeez",
-  "licencia": "Public domain",
-  "url_lic": "",
-  "url_pag": "https://commons.wikimedia.org/wiki/File:Espa%C3%B1a_Alicante_Ayuntamiento_2023.svg",
+  "pagina": "es:Casa consistorial de Alicante",
+  "lat_wiki": 38.34523056,
+  "lon_wiki": -0.48133056,
+  "archivo": "Ayuntamiento_de_Alicante,_España,_2014-07-04,_DD_37.JPG",
+  "autor": "Diego Delso",
+  "licencia": "CC BY-SA 3.0",
+  "url_lic": "https://creativecommons.org/licenses/by-sa/3.0",
+  "url_pag": "https://commons.wikimedia.org/wiki/File:Ayuntamiento_de_Alicante,_Espa%C3%B1a,_2014-07-04,_DD_37.JPG",
   "foto": "mapas/poi/ayto_alicante.jpg"
  },
  {
