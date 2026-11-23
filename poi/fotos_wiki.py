@@ -17,6 +17,11 @@ for L in LUGARES:
           r['pagina'] = f'{lang}:{pg["title"]}'
           if pg.get('coordinates'): r['lat_wiki'], r['lon_wiki'] = pg['coordinates'][0]['lat'], pg['coordinates'][0]['lon']
           if pg.get('pageimage') and not r.get('archivo'): r['archivo'] = pg['pageimage']
+          qid = (pg.get('pageprops') or {}).get('wikibase_item')
+          if qid and not r.get('lat_wiki'):
+              w = get('https://www.wikidata.org/w/api.php?' + urllib.parse.urlencode(dict(action='wbgetclaims', format='json', entity=qid, property='P625')))
+              c = w.get('claims', {}).get('P625')
+              if c: v = c[0]['mainsnak']['datavalue']['value']; r['lat_wiki'], r['lon_wiki'] = v['latitude'], v['longitude']
           if r.get('archivo'): break
       if r.get('archivo'):
           q = get('https://commons.wikimedia.org/w/api.php?' + urllib.parse.urlencode(dict(action='query', format='json',
