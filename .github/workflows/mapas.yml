@@ -7,21 +7,12 @@ permissions:
 jobs:
   descarga:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: MDT05 del IGN (WCS) a lo largo del recorrido
+      - name: Fotos (Wikipedia/Commons) y coordenadas de los puntos turísticos
         run: |
-          mkdir -p mapas
-          curl -sf --max-time 120 "https://servicios.idee.es/wcs-inspire/mdt?SERVICE=WCS&REQUEST=GetCapabilities&VERSION=2.0.1" -o mapas/mdt_capabilities.xml || true
-          grep -o "<wcs:CoverageId>[^<]*" mapas/mdt_capabilities.xml | head -40 || true
-          for t in 696000,4233000 696000,4237096 700096,4233000 700096,4237096 700096,4241192 704192,4233000 704192,4237096 704192,4241192 708288,4237096 708288,4241192 712384,4237096 712384,4241192 712384,4245288 716480,4237096 716480,4241192 716480,4245288 716480,4249384 720576,4241192 720576,4245288 720576,4249384; do
-            x0=${t%,*}; y0=${t#*,}; x1=$((x0+4096)); y1=$((y0+4096))
-            for cov in Elevacion25830_5 Elevacion25830_25; do
-              if curl -sf --max-time 180 -o "mapas/mdt_${cov}_${x0}_${y0}.tif" "https://servicios.idee.es/wcs-inspire/mdt?SERVICE=WCS&REQUEST=GetCoverage&VERSION=2.0.1&COVERAGEID=${cov}&SUBSET=x(${x0},${x1})&SUBSET=y(${y0},${y1})&FORMAT=image/tiff" && file "mapas/mdt_${cov}_${x0}_${y0}.tif" | grep -qi tiff; then break; fi
-              rm -f "mapas/mdt_${cov}_${x0}_${y0}.tif"
-            done
-          done
-          ls -la mapas
+          python3 poi/fotos_wiki.py
+          ls -la mapas/poi
           git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
-          git add mapas && git commit -m "MDT05 (© IGN) para el perfil del recorrido" && git push
+          git add mapas && git commit -m "Fotos de Wikimedia Commons para los puntos turísticos" && git push
