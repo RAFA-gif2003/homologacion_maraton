@@ -10,23 +10,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Límites municipales (OSM)
+      - name: Ortofoto PNOA de detalle (0,2 m/px) en cada punto
         run: |
-          sudo apt-get -qq update && sudo apt-get -qq install -y osmium-tool > /dev/null
-          curl -sfL --max-time 600 -o v.osm.pbf https://download.geofabrik.de/europe/spain/valencia-latest.osm.pbf
-          osmium extract --strategy=smart -b -0.75,38.25,-0.40,38.40 v.osm.pbf -o z.osm.pbf --overwrite
-          osmium tags-filter z.osm.pbf r/boundary=administrative -o b.osm.pbf --overwrite
-          osmium export b.osm.pbf -f geojsonseq -o b.geojsonseq --overwrite --geometry-types=polygon,multipolygon
           mkdir -p mapas
-          python3 - <<'PY'
-          import json
-          out = open('mapas/limites_tm.geojsonseq', 'w'); n = 0
-          for ln in open('b.geojsonseq'):
-              f = json.loads(ln.strip().lstrip('\x1e')); p = f.get('properties') or {}
-              if str(p.get('admin_level')) == '8':
-                  out.write(json.dumps(f) + '\n'); n += 1; print(p.get('name'))
-          print('municipios', n)
-          PY
+          for w in 15,700707,4236724,701407,4237174 20,702879,4238204,703579,4238654 25,707577,4239816,708277,4240266 30,712249,4241281,712949,4241731 35,716687,4242747,717387,4243197; do
+            IFS=, read n x0 y0 x1 y1 <<< "$w"
+            for i in 1 2 3; do
+              curl -sf --max-time 180 -o "mapas/det_${n}_${x0}_${y0}_${x1}_${y1}.jpg" "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG:25830&BBOX=${x0},${y0},${x1},${y1}&WIDTH=3500&HEIGHT=2250&FORMAT=image/jpeg" && file mapas/det_${n}_*.jpg | grep -q JPEG && break
+              rm -f mapas/det_${n}_*.jpg; sleep 5
+            done
+          done
           ls -la mapas
           git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
-          git add mapas && git commit -m "Límites municipales (© OpenStreetMap contributors)" && git push
+          git add mapas && git commit -m "Ortofoto PNOA de detalle (© IGN)" && git push
